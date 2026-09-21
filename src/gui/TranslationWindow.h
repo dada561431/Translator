@@ -15,11 +15,17 @@ class SettingsManager;
 
 class TranslationWindow final : public QWidget
 {
+    Q_OBJECT
+
 public:
     explicit TranslationWindow(SettingsManager &settings, QWidget *parent = nullptr);
 
     void setTranslatedText(const QString &text);
     void setOriginalText(const QString &text);
+    void setRegionFeedback(const QString &message);
+
+signals:
+    void regionSelectionRequested();
 
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override;

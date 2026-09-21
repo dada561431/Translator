@@ -1,6 +1,7 @@
 #include <QApplication>
 #include <QCoreApplication>
 
+#include "app/CaptureCoordinator.h"
 #include "config/SettingsManager.h"
 #include "gui/TranslationWindow.h"
 
@@ -12,6 +13,7 @@ int main(int argc, char *argv[])
 
     SettingsManager settings;
     TranslationWindow translationWindow(settings);
+    CaptureCoordinator captureCoordinator(translationWindow, settings);
     translationWindow.show();
 
     return application.exec();

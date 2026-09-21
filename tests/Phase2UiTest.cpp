@@ -240,10 +240,15 @@ int main(int argc, char *argv[])
         application.processEvents();
 
         if (region && status) {
+            int regionRequests = 0;
+            QObject::connect(&window, &TranslationWindow::regionSelectionRequested,
+                             &window, [&regionRequests] { ++regionRequests; });
             region->click();
-            check(status->text() == QStringLiteral("Region selection is not implemented yet."),
-                  "Region reports unimplemented state");
-            check(status->isVisible(), "Region feedback is shown inside the toolbar");
+            check(regionRequests == 1, "Region emits a selection request");
+            window.setRegionFeedback(QStringLiteral("Region selected: 120 x 80"));
+            check(region->toolTip() == QStringLiteral("Region selected: 120 x 80"),
+                  "Region feedback updates button tooltip");
+            check(status->isVisible(), "Region feedback is briefly shown in toolbar");
         }
         if (start && stop && status) {
             start->click();

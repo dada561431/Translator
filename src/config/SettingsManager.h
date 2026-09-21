@@ -2,6 +2,7 @@
 
 #include <QByteArray>
 #include <QSettings>
+#include <QRect>
 #include <QString>
 #include <QStringList>
 
@@ -15,12 +16,15 @@ public:
     QString ocrEngine();
     QString translator();
     QByteArray windowGeometry() const;
+    QRect captureRegion() const;
+    QString captureScreen() const;
 
     void setSourceLanguage(const QString &languageId);
     void setTargetLanguage(const QString &languageId);
     void setOcrEngine(const QString &engineId);
     void setTranslator(const QString &translatorId);
     void setWindowGeometry(const QByteArray &geometry);
+    void setCaptureRegion(const QRect &region, const QString &screenName);
 
 private:
     QString readValidated(const QString &key,

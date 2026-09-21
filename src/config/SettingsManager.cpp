@@ -1,5 +1,8 @@
 #include "config/SettingsManager.h"
 
+#include <QGuiApplication>
+#include <QScreen>
+
 namespace {
 
 const QString kSourceLanguageKey = QStringLiteral("language/source");
@@ -7,6 +10,8 @@ const QString kTargetLanguageKey = QStringLiteral("language/target");
 const QString kOcrEngineKey = QStringLiteral("ocr/engine");
 const QString kTranslatorKey = QStringLiteral("translator/engine");
 const QString kWindowGeometryKey = QStringLiteral("window/geometry");
+const QString kCaptureRegionKey = QStringLiteral("capture/region");
+const QString kCaptureScreenKey = QStringLiteral("capture/screen");
 
 const QString kDefaultSourceLanguage = QStringLiteral("auto");
 const QString kDefaultTargetLanguage = QStringLiteral("zh");
@@ -66,6 +71,27 @@ QByteArray SettingsManager::windowGeometry() const
     return settings_.value(kWindowGeometryKey).toByteArray();
 }
 
+QRect SettingsManager::captureRegion() const
+{
+    const QRect region = settings_.value(kCaptureRegionKey).toRect();
+    const QString screenName = captureScreen();
+    if (region.width() < 10 || region.height() < 10) {
+        return {};
+    }
+
+    for (const QScreen *screen : QGuiApplication::screens()) {
+        if (screen->name() == screenName && screen->geometry().contains(region)) {
+            return region;
+        }
+    }
+    return {};
+}
+
+QString SettingsManager::captureScreen() const
+{
+    return settings_.value(kCaptureScreenKey).toString();
+}
+
 void SettingsManager::setSourceLanguage(const QString &languageId)
 {
     writeValidated(kSourceLanguageKey, languageId, kSourceLanguages, kDefaultSourceLanguage);
@@ -89,6 +115,13 @@ void SettingsManager::setTranslator(const QString &translatorId)
 void SettingsManager::setWindowGeometry(const QByteArray &geometry)
 {
     settings_.setValue(kWindowGeometryKey, geometry);
+    settings_.sync();
+}
+
+void SettingsManager::setCaptureRegion(const QRect &region, const QString &screenName)
+{
+    settings_.setValue(kCaptureRegionKey, region);
+    settings_.setValue(kCaptureScreenKey, screenName);
     settings_.sync();
 }
 

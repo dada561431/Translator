@@ -14,6 +14,12 @@ find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets)
 
 add_executable(Translator
     src/main.cpp
+    src/app/CaptureCoordinator.cpp
+    src/app/CaptureCoordinator.h
+    src/capture/RegionSelector.cpp
+    src/capture/RegionSelector.h
+    src/capture/ScreenCaptureService.cpp
+    src/capture/ScreenCaptureService.h
     src/config/SettingsManager.cpp
     src/config/SettingsManager.h
     src/gui/SettingsDialog.cpp
@@ -57,6 +63,22 @@ if(BUILD_TESTING)
 
     add_test(NAME phase2_ui_and_settings COMMAND TranslatorPhase2Tests)
     set_tests_properties(phase2_ui_and_settings PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    )
+
+    add_executable(TranslatorPhase3Tests
+        tests/Phase3CaptureTest.cpp
+        src/capture/RegionSelector.cpp
+        src/capture/RegionSelector.h
+        src/capture/ScreenCaptureService.cpp
+        src/capture/ScreenCaptureService.h
+        src/config/SettingsManager.cpp
+        src/config/SettingsManager.h
+    )
+    target_include_directories(TranslatorPhase3Tests PRIVATE src)
+    target_link_libraries(TranslatorPhase3Tests PRIVATE Qt6::Core Qt6::Gui Qt6::Widgets)
+    add_test(NAME phase3_capture_logic COMMAND TranslatorPhase3Tests)
+    set_tests_properties(phase3_capture_logic PROPERTIES
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
     )
 endif()

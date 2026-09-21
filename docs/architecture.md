@@ -110,9 +110,9 @@ flowchart LR
 
 Hook、剪贴板、文件和语音识别来源从各自回调进入 `basetext.dispatchtext()`，之后共享同一条文本处理与翻译链。OCR 引擎若自身已经返回译文，则通过 `displayinfomessage(..., "<notrans>")` 直接显示，不进入普通翻译器链。
 
-## Phase 2.5 当前架构
+## Phase 2.5 字幕 UI 与 Phase 3 捕获架构
 
-Phase 2.5 将传统设置主窗口重构为面向实时屏幕翻译工作流的悬浮窗口，同时不提前创建后续管线接口：
+Phase 2.5 将传统设置主窗口重构为字幕悬浮窗；Phase 3 在独立捕获层接入真实选区和单帧截图：
 
 ```mermaid
 flowchart TD
@@ -126,6 +126,11 @@ flowchart TD
     Toolbar --> Dialog[SettingsDialog]
     Dialog --> Settings
     Settings --> Store[QSettings]
+    Toolbar -->|regionSelectionRequested| Coordinator[CaptureCoordinator]
+    Coordinator --> Selector[RegionSelector]
+    Selector -->|Qt global logical QRect + QScreen| Capture[ScreenCaptureService]
+    Capture --> Result[CaptureResult / QImage]
+    Coordinator --> Settings
 ```
 
 `main.cpp` 在创建配置对象前设置 organization/application name，并通过构造函数把唯一的 `SettingsManager` 实例传给 `TranslationWindow`。`TranslationWindow` 持有唯一的 `SettingsDialog`；设置对话框通过同一 `SettingsManager` 读写配置，不直接创建或分散使用 `QSettings`。
@@ -147,6 +152,14 @@ flowchart LR
 
 工具栏空白区域和字幕区域通过 `QWindow::startSystemMove()` 请求系统移动窗口，字幕区域边缘使用 `startSystemResize()`。按钮区域仍保持正常点击。窗口关闭时用 `saveGeometry()` 写入 `window/geometry`；恢复后若窗口矩形与所有屏幕的 `availableGeometry()` 均不相交，则回退到默认的宽屏字幕尺寸并居中到主屏。
 
+### Phase 3 坐标与时序
+
+`main.cpp` 创建一个轻量 `CaptureCoordinator`，连接 `TranslationWindow::regionSelectionRequested()`、`RegionSelector` 和 `ScreenCaptureService`。窗口只发 UI 请求；选择器只产出所选 `QScreen` 与 **Qt global logical coordinates** 的 `QRect`；截图服务只产出 `CaptureResult`，不认识字幕 UI。
+
+每块 `QScreen` 各有一层单屏选择 overlay。拖动起点决定当前屏幕，终点限制在该屏幕内；本阶段不跨不同 DPI 的屏幕选区。`ScreenCaptureService` 先验证 `screen->geometry().contains(globalRect)`，再减去 `screen->geometry().topLeft()` 得到 screen-local logical rect，传给 `QScreen::grabWindow(0, x, y, w, h)`。负的显示器全局坐标是合法的；不能假定屏幕原点为 `(0,0)`。Qt 返回的 `QPixmap` 转为 `QImage`，记录逻辑选区、实际图像像素尺寸和 `QScreen::devicePixelRatio()`；不凭猜测手工乘除 DPR。
+
+点击 Region 时先隐藏字幕窗，稍后显示 overlay。松开鼠标后先隐藏所有 overlay，再延迟 150ms 截图，此时字幕窗仍隐藏；成功或失败均恢复字幕窗。Escape、右键、过小/无效矩形取消选择，不覆盖之前有效 Region，也不截图。成功选区以 `QRect` QVariant 和屏幕名称分别保存在 `capture/region`、`capture/screen`，启动时仅验证恢复，不自动截图。Debug 构建只在本地系统临时目录覆盖 `Translator/last_capture.png`；不联网、不存历史。当前优先保证正确性，高性能 Windows capture backend 待实时阶段评估。
+
 ## Qt 6/C++ 版本架构
 
 ### 设计原则
@@ -161,20 +174,20 @@ flowchart LR
 
 | 目录 | 计划职责 | 当前状态 |
 | --- | --- | --- |
-| `src/app/` | 应用生命周期、依赖组装、管线协调 | 仅建立边界 |
+| `src/app/` | 应用生命周期、依赖组装、管线协调 | 已实现小型 `CaptureCoordinator` |
 | `src/gui/` | 悬浮翻译窗口、设置界面及后续 overlay 交互 | 已实现 `TranslationWindow` 与 `SettingsDialog` |
-| `src/capture/` | 平台无关捕获接口与 Windows 捕获适配器 | 未实现 |
+| `src/capture/` | 区域选择、Qt 单帧截图及结果模型 | 已实现 `RegionSelector` 与 `ScreenCaptureService` |
 | `src/textsource/` | `ITextSource` 及 OCR/剪贴板/Hook 等来源 | 未实现 |
 | `src/ocr/` | `IOcrEngine`、结果模型与引擎选择 | 未实现 |
 | `src/processing/` | 源文本预处理、翻译前后处理和管线编排 | 未实现 |
 | `src/translator/` | `ITranslator`、调度、缓存与后端 | 未实现 |
 | `src/config/` | 配置模型、校验、迁移和持久化 | 已实现基础 `SettingsManager`/`QSettings` |
 
-Phase 2.5 仍不为后续边界创建空类。当前构建目标只包含已经实际使用的 GUI 与配置代码，不冻结尚未验证的 OCR、翻译或管线接口。
+Phase 3 仍不为后续 OCR、翻译或实时管线边界创建空类。当前构建目标只包含已经实际使用的 GUI、配置和捕获代码。
 
 ### 建议运行时关系
 
-后续应用编排层应把 Region/Capture/OCR/Translation 的结果接到 `TranslationWindow::setOriginalText()` 和 `setTranslatedText()`，并通过状态更新接口反映管线状态。GUI 不应直接选择 native DLL 或调用具体服务；具体编排类型等真正接入后端时再建立。
+Phase 4 可直接消费 `CaptureResult::image` 作为 OCR 输入，再将识别文本送到 `TranslationWindow::setOriginalText()`。后续翻译结果进入 `setTranslatedText()`。GUI 不应直接选择 native DLL 或调用具体服务；OCR/翻译编排类型等真正接入后端时再建立。
 
 ## 原模块到新模块映射
 

@@ -82,6 +82,12 @@ void TranslationWindow::setOriginalText(const QString &text)
     originalLabel_->setText(text);
 }
 
+void TranslationWindow::setRegionFeedback(const QString &message)
+{
+    regionButton_->setToolTip(message);
+    showToolbarStatus(message);
+}
+
 bool TranslationWindow::eventFilter(QObject *watched, QEvent *event)
 {
     const auto *watchedWidget = qobject_cast<QWidget *>(watched);
@@ -302,9 +308,8 @@ void TranslationWindow::connectControls()
     statusClearTimer_->setInterval(3000);
     connect(statusClearTimer_, &QTimer::timeout, statusLabel_, &QWidget::hide);
 
-    connect(regionButton_, &QPushButton::clicked, this, [this] {
-        showToolbarStatus(tr("Region selection is not implemented yet."));
-    });
+    connect(regionButton_, &QPushButton::clicked,
+            this, &TranslationWindow::regionSelectionRequested);
     connect(startButton_, &QPushButton::clicked, this, [this] {
         setTranslationRunning(true);
         showToolbarStatus(tr("Translation UI started. Backend is not implemented yet."));
