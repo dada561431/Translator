@@ -1,8 +1,8 @@
-# Translator 架构分析与 Phase 1 设计
+# Translator 架构分析与阶段设计
 
 ## 范围
 
-本文基于当前仓库源码的实际调用关系，记录 LunaTranslator 的核心架构，并给出 Qt 6/C++ 重构的模块边界。Phase 1 只实现可配置、可编译、可启动的 Qt Widgets 骨架；OCR、屏幕捕获、翻译、Hook、TTS 和完整实时管线均不在本阶段实现范围内。
+本文基于当前仓库源码的实际调用关系，记录 LunaTranslator 的核心架构，并给出 Translator 的 Qt 6/C++ 模块边界。Phase 1 建立了可配置、可编译、可启动的 Qt Widgets 骨架；Phase 2 增加基础翻译界面和设置持久化。OCR、屏幕捕获、翻译后端、Hook、TTS 和完整实时管线仍不在当前实现范围内。
 
 ## 原项目架构
 
@@ -110,6 +110,31 @@ flowchart LR
 
 Hook、剪贴板、文件和语音识别来源从各自回调进入 `basetext.dispatchtext()`，之后共享同一条文本处理与翻译链。OCR 引擎若自身已经返回译文，则通过 `displayinfomessage(..., "<notrans>")` 直接显示，不进入普通翻译器链。
 
+## Phase 2 当前架构
+
+Phase 2 保持直接、可验证的对象关系，不提前创建后续管线接口：
+
+```mermaid
+flowchart TD
+    Main[main.cpp] --> Identity[QCoreApplication identity]
+    Identity --> Settings[SettingsManager]
+    Settings --> Window[MainWindow]
+    Window --> Widgets[Qt Widgets]
+```
+
+`main.cpp` 在创建配置对象前设置 organization/application name，并通过构造函数把唯一的 `SettingsManager` 实例传给 `MainWindow`。`MainWindow` 不直接创建或分散使用 `QSettings`。
+
+配置流如下：
+
+```mermaid
+flowchart LR
+    Combo[QComboBox] --> Data[itemData stable ID]
+    Data --> Manager[SettingsManager]
+    Manager --> Store[QSettings]
+```
+
+当前稳定 ID 为语言代码 `auto`、`zh`、`en`、`ja`、`ko`，OCR engine 为 `windows_ocr`，Translator 为 `none`。`SettingsManager` 在读取时验证值；缺失、非法或已经移除的 ID 会回退到默认值并写回配置。
+
 ## Qt 6/C++ 版本架构
 
 ### 设计原则
@@ -125,15 +150,15 @@ Hook、剪贴板、文件和语音识别来源从各自回调进入 `basetext.di
 | 目录 | 计划职责 | Phase 1 状态 |
 | --- | --- | --- |
 | `src/app/` | 应用生命周期、依赖组装、管线协调 | 仅建立边界 |
-| `src/gui/` | `MainWindow`、后续 overlay 和设置界面 | 已实现最小 `MainWindow` |
+| `src/gui/` | `MainWindow`、后续 overlay 和设置界面 | 已实现 Phase 2 基础翻译界面 |
 | `src/capture/` | 平台无关捕获接口与 Windows 捕获适配器 | 未实现 |
 | `src/textsource/` | `ITextSource` 及 OCR/剪贴板/Hook 等来源 | 未实现 |
 | `src/ocr/` | `IOcrEngine`、结果模型与引擎选择 | 未实现 |
 | `src/processing/` | 源文本预处理、翻译前后处理和管线编排 | 未实现 |
 | `src/translator/` | `ITranslator`、调度、缓存与后端 | 未实现 |
-| `src/config/` | JSON 配置模型、校验、迁移和持久化 | 未实现 |
+| `src/config/` | 配置模型、校验、迁移和持久化 | 已实现基础 `SettingsManager`/`QSettings` |
 
-Phase 1 不为这些边界创建空类；只有已经可运行的 GUI 代码进入构建目标。这样目录说明未来所有权，但不会冻结尚未验证的接口。
+Phase 2 仍不为后续边界创建空类。当前构建目标只包含已经实际使用的 GUI 与配置代码，不冻结尚未验证的 OCR、翻译或管线接口。
 
 ### 建议运行时关系
 
