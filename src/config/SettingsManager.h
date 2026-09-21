@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QByteArray>
 #include <QSettings>
 #include <QString>
 #include <QStringList>
@@ -13,11 +14,13 @@ public:
     QString targetLanguage();
     QString ocrEngine();
     QString translator();
+    QByteArray windowGeometry() const;
 
     void setSourceLanguage(const QString &languageId);
     void setTargetLanguage(const QString &languageId);
     void setOcrEngine(const QString &engineId);
     void setTranslator(const QString &translatorId);
+    void setWindowGeometry(const QByteArray &geometry);
 
 private:
     QString readValidated(const QString &key,

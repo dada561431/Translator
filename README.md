@@ -4,18 +4,20 @@
 
 ## 当前阶段
 
-当前为 Phase 2：基础翻译界面与设置持久化。
+当前为 Phase 2.5：悬浮翻译窗口 UI 架构。
 
 已实现：
 
-- Qt 6 application 和 `QMainWindow`
-- 基础翻译 UI
-- Source/Target Language 选择
-- OCR/Translator engine 选择
+- Qt 6 application 和轻量 `TranslationWindow`
+- 无系统标题栏、始终置顶的半透明悬浮窗口
+- Region/Start/Stop/Settings/Close 工具栏
+- 独立 `SettingsDialog`
+- Source/Target Language 和 OCR/Translator engine 选择
 - Original Text 和 Translation 只读显示区域
 - Start/Stop 基础 UI 状态切换
 - 基于 `QSettings` 的配置持久化
 - 非法或过期配置的默认值回退
+- 悬浮窗口位置与尺寸恢复，以及屏幕外位置回退
 
 ## 尚未实现
 
@@ -28,7 +30,13 @@
 - Hook
 - TTS
 
-当前界面不会伪装这些后端已经可用。未实现操作只更新状态栏，不会发起截图、OCR、翻译或网络请求。
+当前界面不会伪装这些后端已经可用。未实现操作只更新悬浮窗状态标签，不会发起截图、OCR、翻译或网络请求。
+
+## 当前 UI 架构
+
+应用启动后首先显示 `TranslationWindow`。语言和引擎配置不长期占用悬浮窗口，而是由工具栏的 Settings 按钮打开唯一的 `SettingsDialog`。两个窗口共享同一个 `SettingsManager`，所有配置继续由 `QSettings` 集中持久化。
+
+`TranslationWindow` 使用 Qt 原生 `QWindow::startSystemMove()` 支持从工具栏空白区域拖动。当前不启用鼠标穿透或工具栏自动隐藏，以确保窗口仍可直接操作。
 
 ## 构建
 

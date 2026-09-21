@@ -16,8 +16,10 @@ add_executable(Translator
     src/main.cpp
     src/config/SettingsManager.cpp
     src/config/SettingsManager.h
-    src/gui/MainWindow.cpp
-    src/gui/MainWindow.h
+    src/gui/SettingsDialog.cpp
+    src/gui/SettingsDialog.h
+    src/gui/TranslationWindow.cpp
+    src/gui/TranslationWindow.h
 )
 
 target_include_directories(Translator PRIVATE src)
@@ -39,8 +41,10 @@ if(BUILD_TESTING)
         tests/Phase2UiTest.cpp
         src/config/SettingsManager.cpp
         src/config/SettingsManager.h
-        src/gui/MainWindow.cpp
-        src/gui/MainWindow.h
+        src/gui/SettingsDialog.cpp
+        src/gui/SettingsDialog.h
+        src/gui/TranslationWindow.cpp
+        src/gui/TranslationWindow.h
     )
 
     target_include_directories(TranslatorPhase2Tests PRIVATE src)

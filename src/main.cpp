@@ -2,7 +2,7 @@
 #include <QCoreApplication>
 
 #include "config/SettingsManager.h"
-#include "gui/MainWindow.h"
+#include "gui/TranslationWindow.h"
 
 int main(int argc, char *argv[])
 {
@@ -11,8 +11,8 @@ int main(int argc, char *argv[])
     QApplication::setApplicationName(QStringLiteral("Translator"));
 
     SettingsManager settings;
-    MainWindow mainWindow(settings);
-    mainWindow.show();
+    TranslationWindow translationWindow(settings);
+    translationWindow.show();
 
     return application.exec();
 }

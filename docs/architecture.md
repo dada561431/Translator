@@ -110,19 +110,23 @@ flowchart LR
 
 Hook、剪贴板、文件和语音识别来源从各自回调进入 `basetext.dispatchtext()`，之后共享同一条文本处理与翻译链。OCR 引擎若自身已经返回译文，则通过 `displayinfomessage(..., "<notrans>")` 直接显示，不进入普通翻译器链。
 
-## Phase 2 当前架构
+## Phase 2.5 当前架构
 
-Phase 2 保持直接、可验证的对象关系，不提前创建后续管线接口：
+Phase 2.5 将传统设置主窗口重构为面向实时屏幕翻译工作流的悬浮窗口，同时不提前创建后续管线接口：
 
 ```mermaid
 flowchart TD
     Main[main.cpp] --> Identity[QCoreApplication identity]
     Identity --> Settings[SettingsManager]
-    Settings --> Window[MainWindow]
-    Window --> Widgets[Qt Widgets]
+    Settings --> Window[TranslationWindow]
+    Window --> Toolbar[Toolbar]
+    Window --> Display[Original + Translation Display]
+    Toolbar --> Dialog[SettingsDialog]
+    Dialog --> Settings
+    Settings --> Store[QSettings]
 ```
 
-`main.cpp` 在创建配置对象前设置 organization/application name，并通过构造函数把唯一的 `SettingsManager` 实例传给 `MainWindow`。`MainWindow` 不直接创建或分散使用 `QSettings`。
+`main.cpp` 在创建配置对象前设置 organization/application name，并通过构造函数把唯一的 `SettingsManager` 实例传给 `TranslationWindow`。`TranslationWindow` 持有唯一的 `SettingsDialog`；设置对话框通过同一 `SettingsManager` 读写配置，不直接创建或分散使用 `QSettings`。
 
 配置流如下：
 
@@ -134,6 +138,8 @@ flowchart LR
 ```
 
 当前稳定 ID 为语言代码 `auto`、`zh`、`en`、`ja`、`ko`，OCR engine 为 `windows_ocr`，Translator 为 `none`。`SettingsManager` 在读取时验证值；缺失、非法或已经移除的 ID 会回退到默认值并写回配置。
+
+`TranslationWindow` 是 `QWidget` 顶层窗口，使用 `Qt::FramelessWindowHint`、`Qt::WindowStaysOnTopHint` 和 `Qt::WA_TranslucentBackground`。工具栏空白区域通过 `QWindow::startSystemMove()` 请求系统移动窗口，按钮区域仍保持正常点击。窗口关闭时用 `saveGeometry()` 写入 `window/geometry`；恢复后若窗口矩形与所有屏幕的 `availableGeometry()` 均不相交，则回退到默认尺寸并居中到主屏。
 
 ## Qt 6/C++ 版本架构
 
@@ -147,10 +153,10 @@ flowchart LR
 
 ### 计划目录与职责
 
-| 目录 | 计划职责 | Phase 1 状态 |
+| 目录 | 计划职责 | 当前状态 |
 | --- | --- | --- |
 | `src/app/` | 应用生命周期、依赖组装、管线协调 | 仅建立边界 |
-| `src/gui/` | `MainWindow`、后续 overlay 和设置界面 | 已实现 Phase 2 基础翻译界面 |
+| `src/gui/` | 悬浮翻译窗口、设置界面及后续 overlay 交互 | 已实现 `TranslationWindow` 与 `SettingsDialog` |
 | `src/capture/` | 平台无关捕获接口与 Windows 捕获适配器 | 未实现 |
 | `src/textsource/` | `ITextSource` 及 OCR/剪贴板/Hook 等来源 | 未实现 |
 | `src/ocr/` | `IOcrEngine`、结果模型与引擎选择 | 未实现 |
@@ -158,11 +164,11 @@ flowchart LR
 | `src/translator/` | `ITranslator`、调度、缓存与后端 | 未实现 |
 | `src/config/` | 配置模型、校验、迁移和持久化 | 已实现基础 `SettingsManager`/`QSettings` |
 
-Phase 2 仍不为后续边界创建空类。当前构建目标只包含已经实际使用的 GUI 与配置代码，不冻结尚未验证的 OCR、翻译或管线接口。
+Phase 2.5 仍不为后续边界创建空类。当前构建目标只包含已经实际使用的 GUI 与配置代码，不冻结尚未验证的 OCR、翻译或管线接口。
 
 ### 建议运行时关系
 
-后续由 `ApplicationController` 组装 `MainWindow`、`TextSourceManager`、`RecognitionPipeline`、`TranslatorManager` 和 `ConfigService`。`ITextSource` 只发布文本或帧事件；OCR、处理和翻译由管线服务调度；GUI 只订阅状态和结果，不直接选择 native DLL 或调用具体服务。
+后续应用编排层应把 Region/Capture/OCR/Translation 的结果接到 `TranslationWindow::setOriginalText()` 和 `setTranslatedText()`，并通过状态更新接口反映管线状态。GUI 不应直接选择 native DLL 或调用具体服务；具体编排类型等真正接入后端时再建立。
 
 ## 原模块到新模块映射
 
@@ -170,7 +176,7 @@ Phase 2 仍不为后续边界创建空类。当前构建目标只包含已经实
 | --- | --- | --- |
 | `main.py`、`gobject.py` | `main.cpp`、`src/app/` | 保留启动顺序；全局状态改为显式对象所有权与依赖注入 |
 | `BASEOBJECT` | `ApplicationController` + 管线/管理器 | 拆分生命周期、状态、翻译调度和 UI 协调职责 |
-| `gui/translatorUI.py`、`gui/rendertext/` | `src/gui/` | 使用 Qt Widgets；Phase 1 仅提供 `QMainWindow` |
+| `gui/translatorUI.py`、`gui/rendertext/` | `src/gui/` | 使用独立 Qt Widgets 悬浮窗和设置对话框，不复制原项目视觉资源 |
 | `textsourcebase.py` 与各文本源 | `src/textsource/` | 抽象 `ITextSource`，用 typed signal 发布输入 |
 | `ocrtext.py`、`rangeselect.py` | `src/textsource/` + `src/capture/` + `src/gui/` | 分离触发策略、图像捕获和区域 UI |
 | `ocrutil.py`、`ocrengines/` | `src/ocr/` | 保留统一结果和引擎选择；用 C++ 接口/工厂替代动态 Python import |

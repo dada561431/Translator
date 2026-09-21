@@ -6,6 +6,7 @@ const QString kSourceLanguageKey = QStringLiteral("language/source");
 const QString kTargetLanguageKey = QStringLiteral("language/target");
 const QString kOcrEngineKey = QStringLiteral("ocr/engine");
 const QString kTranslatorKey = QStringLiteral("translator/engine");
+const QString kWindowGeometryKey = QStringLiteral("window/geometry");
 
 const QString kDefaultSourceLanguage = QStringLiteral("auto");
 const QString kDefaultTargetLanguage = QStringLiteral("zh");
@@ -60,6 +61,11 @@ QString SettingsManager::translator()
     return readValidated(kTranslatorKey, kTranslators, kDefaultTranslator);
 }
 
+QByteArray SettingsManager::windowGeometry() const
+{
+    return settings_.value(kWindowGeometryKey).toByteArray();
+}
+
 void SettingsManager::setSourceLanguage(const QString &languageId)
 {
     writeValidated(kSourceLanguageKey, languageId, kSourceLanguages, kDefaultSourceLanguage);
@@ -78,6 +84,12 @@ void SettingsManager::setOcrEngine(const QString &engineId)
 void SettingsManager::setTranslator(const QString &translatorId)
 {
     writeValidated(kTranslatorKey, translatorId, kTranslators, kDefaultTranslator);
+}
+
+void SettingsManager::setWindowGeometry(const QByteArray &geometry)
+{
+    settings_.setValue(kWindowGeometryKey, geometry);
+    settings_.sync();
 }
 
 QString SettingsManager::readValidated(const QString &key,
