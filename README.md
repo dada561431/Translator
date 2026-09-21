@@ -1,6 +1,6 @@
-# LunaTranslatorQt
+# Translator
 
-`LunaTranslatorQt` 是一个基于 Qt 6、C++17 和 Qt Widgets 的实时屏幕文字识别与翻译程序重构项目。它参考 LunaTranslator 的功能边界和运行流程，但不会机械地逐行移植 Python 代码。
+`Translator` 是一个基于 Qt 6、C++17 和 Qt Widgets 的实时屏幕文字识别与翻译程序。它参考 LunaTranslator 的功能边界和运行流程，但不会机械地逐行移植 Python 代码。
 
 原 LunaTranslator 源码保持独立且不受本工程影响。
 
@@ -34,12 +34,12 @@
 从仓库根目录执行：
 
 ```powershell
-cmake -S .\LunaTranslatorQt -B .\LunaTranslatorQt\build
-cmake --build .\LunaTranslatorQt\build --config Release
+cmake -S . -B .\build\mingw
+cmake --build .\build\mingw --config Release
 ```
 
 对于单配置生成器，可直接运行：
 
 ```powershell
-cmake --build .\LunaTranslatorQt\build
+cmake --build .\build\mingw
 ```

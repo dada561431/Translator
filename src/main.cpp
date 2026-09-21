@@ -5,8 +5,8 @@
 int main(int argc, char *argv[])
 {
     QApplication application(argc, argv);
-    QApplication::setApplicationName(QStringLiteral("LunaTranslatorQt"));
-    QApplication::setOrganizationName(QStringLiteral("LunaTranslatorQt"));
+    QApplication::setApplicationName(QStringLiteral("Translator"));
+    QApplication::setOrganizationName(QStringLiteral("Translator"));
 
     MainWindow mainWindow;
     mainWindow.show();

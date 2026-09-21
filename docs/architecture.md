@@ -1,4 +1,4 @@
-# LunaTranslatorQt 架构分析与 Phase 1 设计
+# Translator 架构分析与 Phase 1 设计
 
 ## 范围
 
@@ -141,7 +141,7 @@ Phase 1 不为这些边界创建空类；只有已经可运行的 GUI 代码进�
 
 ## 原模块到新模块映射
 
-| LunaTranslator 原模块 | LunaTranslatorQt 目标模块 | 迁移策略 |
+| LunaTranslator 原模块 | Translator 目标模块 | 迁移策略 |
 | --- | --- | --- |
 | `main.py`、`gobject.py` | `main.cpp`、`src/app/` | 保留启动顺序；全局状态改为显式对象所有权与依赖注入 |
 | `BASEOBJECT` | `ApplicationController` + 管线/管理器 | 拆分生命周期、状态、翻译调度和 UI 协调职责 |
