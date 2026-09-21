@@ -143,6 +143,8 @@ flowchart LR
 
 `TranslationWindow` 是 `QWidget` 顶层窗口，使用 `Qt::FramelessWindowHint`、`Qt::WindowStaysOnTopHint` 和 `Qt::WA_TranslucentBackground`。主体 `SubtitleArea` 不绘制背景，按“译文在上、原文在下”排列两个自动换行的 `QLabel`，并以高对比文字和轻量阴影保障可读性。半透明工具栏在鼠标进入窗口时显示，离开后延迟检查全窗口命中范围再隐藏，以避免经过子控件时闪烁。
 
+为避免透明空窗口在启动时无法发现，两个字幕字段各自维护 UI placeholder 状态并初始显示位置提示文字。Toolbar 启动时隐藏，鼠标进入整个窗口区域时显示，离开后延迟 400ms 检查全局光标是否确实位于窗口外。任一 setter 首次收到非空文本时只替换对应字段的 placeholder；placeholder 不写入 `SettingsManager` 或后续业务数据流。
+
 工具栏空白区域和字幕区域通过 `QWindow::startSystemMove()` 请求系统移动窗口，字幕区域边缘使用 `startSystemResize()`。按钮区域仍保持正常点击。窗口关闭时用 `saveGeometry()` 写入 `window/geometry`；恢复后若窗口矩形与所有屏幕的 `availableGeometry()` 均不相交，则回退到默认的宽屏字幕尺寸并居中到主屏。
 
 ## Qt 6/C++ 版本架构

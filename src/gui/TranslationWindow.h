@@ -53,4 +53,6 @@ private:
     QTimer *toolbarHideTimer_ = nullptr;
     QTimer *statusClearTimer_ = nullptr;
     SettingsDialog *settingsDialog_ = nullptr;
+    bool translatedPlaceholder_ = true;
+    bool originalPlaceholder_ = true;
 };

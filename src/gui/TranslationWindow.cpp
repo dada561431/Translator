@@ -52,6 +52,8 @@ TranslationWindow::TranslationWindow(SettingsManager &settings, QWidget *parent)
     createUi();
     connectControls();
     setTranslationRunning(false);
+    translatedLabel_->setText(tr("实时翻译将在这里显示"));
+    originalLabel_->setText(tr("Original text appears here"));
 
     settingsDialog_ = new SettingsDialog(settings_, this);
     restoreWindowGeometry();
@@ -60,23 +62,36 @@ TranslationWindow::TranslationWindow(SettingsManager &settings, QWidget *parent)
 
 void TranslationWindow::setTranslatedText(const QString &text)
 {
+    if (translatedPlaceholder_ && text.isEmpty()) {
+        return;
+    }
+    if (!text.isEmpty()) {
+        translatedPlaceholder_ = false;
+    }
     translatedLabel_->setText(text);
 }
 
 void TranslationWindow::setOriginalText(const QString &text)
 {
+    if (originalPlaceholder_ && text.isEmpty()) {
+        return;
+    }
+    if (!text.isEmpty()) {
+        originalPlaceholder_ = false;
+    }
     originalLabel_->setText(text);
 }
 
 bool TranslationWindow::eventFilter(QObject *watched, QEvent *event)
 {
     const auto *watchedWidget = qobject_cast<QWidget *>(watched);
-    const bool isToolbarWidget = watchedWidget
-        && (watchedWidget == toolbar_ || toolbar_->isAncestorOf(watchedWidget));
-    if (isToolbarWidget && event->type() == QEvent::Enter) {
+    const bool isHoverWidget = watchedWidget
+        && (watchedWidget == subtitleArea_ || watchedWidget == toolbar_
+            || toolbar_->isAncestorOf(watchedWidget));
+    if (isHoverWidget && event->type() == QEvent::Enter) {
         toolbarHideTimer_->stop();
         toolbar_->show();
-    } else if (isToolbarWidget && event->type() == QEvent::Leave) {
+    } else if (isHoverWidget && event->type() == QEvent::Leave) {
         scheduleToolbarHide();
     }
 
@@ -275,7 +290,7 @@ void TranslationWindow::connectControls()
 {
     toolbarHideTimer_ = new QTimer(this);
     toolbarHideTimer_->setSingleShot(true);
-    toolbarHideTimer_->setInterval(120);
+    toolbarHideTimer_->setInterval(400);
     connect(toolbarHideTimer_, &QTimer::timeout, this, [this] {
         if (!rect().contains(mapFromGlobal(QCursor::pos()))) {
             toolbar_->hide();

@@ -147,37 +147,74 @@ int main(int argc, char *argv[])
         check(stop && !stop->isEnabled(), "Stop is initially disabled");
         check(original && original->wordWrap(), "original subtitle wraps");
         check(translation && translation->wordWrap(), "translated subtitle wraps");
-        check(original && original->text().isEmpty(), "production original subtitle starts empty");
-        check(translation && translation->text().isEmpty(),
-              "production translated subtitle starts empty");
+        check(original && original->text() == QStringLiteral("Original text appears here"),
+              "production original placeholder is visible");
+        check(translation && translation->text() == QStringLiteral("实时翻译将在这里显示"),
+              "production translated placeholder is visible");
+        QSettings placeholderSettings;
+        for (const QString &key : placeholderSettings.allKeys()) {
+            const QString value = placeholderSettings.value(key).toString();
+            check(value != QStringLiteral("实时翻译将在这里显示")
+                      && value != QStringLiteral("Original text appears here"),
+                  "UI placeholders are not persisted as settings data");
+        }
         check(translation && original
                   && translation->font().pointSizeF() > original->font().pointSizeF(),
               "translated subtitle has greater visual weight");
         check(status && status->text().isEmpty() && !status->isVisible(),
               "status does not permanently occupy subtitle space");
+        check(toolbar && !toolbar->isVisible(), "toolbar is hidden at startup");
+
+        const QPoint translatedPositionWithoutToolbar =
+            translation ? translation->mapTo(&window, QPoint()) : QPoint();
+        const QPoint originalPositionWithoutToolbar =
+            original ? original->mapTo(&window, QPoint()) : QPoint();
+
+        const QString startupScreenshotPath =
+            qEnvironmentVariable("TRANSLATOR_STARTUP_SCREENSHOT_PATH");
+        check(saveWindowScreenshot(window, startupScreenshotPath),
+              "startup placeholder screenshot is saved");
 
         const QPoint initialCursorPosition = QCursor::pos();
         QCursor::setPos(0, 0);
         QEvent leaveEvent(QEvent::Leave);
         QCoreApplication::sendEvent(&window, &leaveEvent);
-        processEventsFor(180);
-        check(toolbar && !toolbar->isVisible(), "toolbar hides after the pointer leaves");
+        processEventsFor(460);
+        check(toolbar && !toolbar->isVisible(),
+              "toolbar remains hidden while the pointer is outside");
 
         const QPoint localHoverPoint(20, 20);
         const QPoint globalHoverPoint = window.mapToGlobal(localHoverPoint);
         QEnterEvent enterEvent(localHoverPoint, localHoverPoint, globalHoverPoint);
         QCoreApplication::sendEvent(&window, &enterEvent);
+        application.processEvents();
         check(toolbar && toolbar->isVisible(), "toolbar appears when the pointer enters");
+        check(translation && translation->mapTo(&window, QPoint())
+                                 == translatedPositionWithoutToolbar,
+              "showing the toolbar does not move the translated subtitle");
+        check(original && original->mapTo(&window, QPoint()) == originalPositionWithoutToolbar,
+              "showing the toolbar does not move the original subtitle");
 
         QCoreApplication::sendEvent(&window, &leaveEvent);
         QEnterEvent buttonEnterEvent(QPointF(2, 2), QPointF(2, 2),
                                      QPointF(region->mapToGlobal(QPoint(2, 2))));
         QCoreApplication::sendEvent(region, &buttonEnterEvent);
-        processEventsFor(180);
+        processEventsFor(460);
         check(toolbar && toolbar->isVisible(),
               "toolbar remains visible during child-widget enter/leave transitions");
 
+        window.setOriginalText(QString());
+        check(original && original->text() == QStringLiteral("Original text appears here"),
+              "empty content does not clear the original placeholder");
+        window.setTranslatedText(QString());
+        check(translation && translation->text() == QStringLiteral("实时翻译将在这里显示"),
+              "empty content does not clear the translated placeholder");
         window.setOriginalText(QStringLiteral("original sample"));
+        check(original && original->text() == QStringLiteral("original sample"),
+              "original text independently replaces its placeholder");
+        check(translation && translation->text() == QStringLiteral("实时翻译将在这里显示"),
+              "translated placeholder remains until translated content arrives");
+
         window.setTranslatedText(QStringLiteral("translated sample"));
         check(original && original->text() == QStringLiteral("original sample"),
               "original text display API works");
@@ -188,6 +225,19 @@ int main(int argc, char *argv[])
                       < original->mapTo(&window, QPoint()).y(),
                   "translated subtitle is above original subtitle");
         }
+
+        QCursor::setPos(0, 0);
+        QCoreApplication::sendEvent(&window, &leaveEvent);
+        processEventsFor(460);
+        check(toolbar && !toolbar->isVisible(), "toolbar hides after the pointer leaves");
+        check(translation && translation->mapTo(&window, QPoint())
+                                 == translatedPositionWithoutToolbar,
+              "hiding the toolbar does not move the translated subtitle");
+        check(original && original->mapTo(&window, QPoint()) == originalPositionWithoutToolbar,
+              "hiding the toolbar does not move the original subtitle");
+
+        QCoreApplication::sendEvent(&window, &enterEvent);
+        application.processEvents();
 
         if (region && status) {
             region->click();
@@ -269,12 +319,12 @@ int main(int argc, char *argv[])
         const QString screenshotPath = qEnvironmentVariable("TRANSLATOR_SCREENSHOT_PATH");
         QCursor::setPos(0, 0);
         QCoreApplication::sendEvent(&window, &leaveEvent);
-        processEventsFor(180);
+        processEventsFor(460);
         check(saveWindowScreenshot(window, screenshotPath), "subtitle screenshot is saved");
 
         const QString toolbarScreenshotPath =
             qEnvironmentVariable("TRANSLATOR_TOOLBAR_SCREENSHOT_PATH");
-        QCursor::setPos(globalHoverPoint);
+        QCursor::setPos(window.mapToGlobal(localHoverPoint));
         QCoreApplication::sendEvent(&window, &enterEvent);
         processEventsFor(80);
         check(saveWindowScreenshot(window, toolbarScreenshotPath), "toolbar screenshot is saved");
