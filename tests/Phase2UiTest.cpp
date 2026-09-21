@@ -1,6 +1,9 @@
 #include <QApplication>
 #include <QComboBox>
 #include <QCoreApplication>
+#include <QCursor>
+#include <QEnterEvent>
+#include <QEventLoop>
 #include <QGuiApplication>
 #include <QLabel>
 #include <QPlainTextEdit>
@@ -11,6 +14,7 @@
 #include <QScreen>
 #include <QSettings>
 #include <QTemporaryDir>
+#include <QTimer>
 #include <QWidget>
 
 #include <iostream>
@@ -59,6 +63,29 @@ bool intersectsAvailableScreen(const QWidget &window)
     return false;
 }
 
+void processEventsFor(int milliseconds)
+{
+    QEventLoop loop;
+    QTimer::singleShot(milliseconds, &loop, &QEventLoop::quit);
+    loop.exec();
+}
+
+bool saveWindowScreenshot(QWidget &window, const QString &path)
+{
+    if (path.isEmpty()) {
+        return true;
+    }
+
+    if (QScreen *screen = window.screen()) {
+        const QPixmap screenshot = screen->grabWindow(
+            0, window.x(), window.y(), window.width(), window.height());
+        if (!screenshot.isNull()) {
+            return screenshot.save(path);
+        }
+    }
+    return window.grab().save(path);
+}
+
 } // namespace
 
 int main(int argc, char *argv[])
@@ -99,36 +126,74 @@ int main(int argc, char *argv[])
         check(window.windowFlags().testFlag(Qt::FramelessWindowHint), "frameless flag is set");
         check(window.windowFlags().testFlag(Qt::WindowStaysOnTopHint), "always-on-top flag is set");
         check(window.testAttribute(Qt::WA_TranslucentBackground), "translucent background is enabled");
+        check(window.width() > window.height() * 2, "default window is wide and subtitle-shaped");
+        check(window.minimumSize() == QSize(420, 120), "empty overlay keeps an operable minimum size");
 
         auto *toolbar = requiredChild<QWidget>(window, "toolbar");
+        auto *subtitleArea = requiredChild<QWidget>(window, "subtitleArea");
         auto *region = requiredChild<QPushButton>(window, "regionButton");
         auto *start = requiredChild<QPushButton>(window, "startButton");
         auto *stop = requiredChild<QPushButton>(window, "stopButton");
         auto *settingsButton = requiredChild<QPushButton>(window, "settingsButton");
         auto *closeButton = requiredChild<QPushButton>(window, "closeButton");
-        auto *original = requiredChild<QPlainTextEdit>(window, "originalTextEdit");
-        auto *translation = requiredChild<QPlainTextEdit>(window, "translationTextEdit");
+        auto *original = requiredChild<QLabel>(window, "originalLabel");
+        auto *translation = requiredChild<QLabel>(window, "translatedLabel");
         auto *status = requiredChild<QLabel>(window, "statusLabel");
 
-        check(toolbar && toolbar->isVisible(), "toolbar is visible");
+        check(subtitleArea && subtitleArea->isVisible(), "subtitle area is visible");
+        check(window.findChildren<QPlainTextEdit *>().isEmpty(), "overlay has no text editors");
         check(region && region->isEnabled(), "Region is initially enabled");
         check(start && start->isEnabled(), "Start is initially enabled");
         check(stop && !stop->isEnabled(), "Stop is initially disabled");
-        check(original && original->isReadOnly(), "original text is read-only");
-        check(translation && translation->isReadOnly(), "translation text is read-only");
-        check(status && status->text() == QStringLiteral("Ready"), "initial status is Ready");
+        check(original && original->wordWrap(), "original subtitle wraps");
+        check(translation && translation->wordWrap(), "translated subtitle wraps");
+        check(original && original->text().isEmpty(), "production original subtitle starts empty");
+        check(translation && translation->text().isEmpty(),
+              "production translated subtitle starts empty");
+        check(translation && original
+                  && translation->font().pointSizeF() > original->font().pointSizeF(),
+              "translated subtitle has greater visual weight");
+        check(status && status->text().isEmpty() && !status->isVisible(),
+              "status does not permanently occupy subtitle space");
+
+        const QPoint initialCursorPosition = QCursor::pos();
+        QCursor::setPos(0, 0);
+        QEvent leaveEvent(QEvent::Leave);
+        QCoreApplication::sendEvent(&window, &leaveEvent);
+        processEventsFor(180);
+        check(toolbar && !toolbar->isVisible(), "toolbar hides after the pointer leaves");
+
+        const QPoint localHoverPoint(20, 20);
+        const QPoint globalHoverPoint = window.mapToGlobal(localHoverPoint);
+        QEnterEvent enterEvent(localHoverPoint, localHoverPoint, globalHoverPoint);
+        QCoreApplication::sendEvent(&window, &enterEvent);
+        check(toolbar && toolbar->isVisible(), "toolbar appears when the pointer enters");
+
+        QCoreApplication::sendEvent(&window, &leaveEvent);
+        QEnterEvent buttonEnterEvent(QPointF(2, 2), QPointF(2, 2),
+                                     QPointF(region->mapToGlobal(QPoint(2, 2))));
+        QCoreApplication::sendEvent(region, &buttonEnterEvent);
+        processEventsFor(180);
+        check(toolbar && toolbar->isVisible(),
+              "toolbar remains visible during child-widget enter/leave transitions");
 
         window.setOriginalText(QStringLiteral("original sample"));
         window.setTranslatedText(QStringLiteral("translated sample"));
-        check(original && original->toPlainText() == QStringLiteral("original sample"),
+        check(original && original->text() == QStringLiteral("original sample"),
               "original text display API works");
-        check(translation && translation->toPlainText() == QStringLiteral("translated sample"),
+        check(translation && translation->text() == QStringLiteral("translated sample"),
               "translated text display API works");
+        if (original && translation) {
+            check(translation->mapTo(&window, QPoint()).y()
+                      < original->mapTo(&window, QPoint()).y(),
+                  "translated subtitle is above original subtitle");
+        }
 
         if (region && status) {
             region->click();
             check(status->text() == QStringLiteral("Region selection is not implemented yet."),
                   "Region reports unimplemented state");
+            check(status->isVisible(), "Region feedback is shown inside the toolbar");
         }
         if (start && stop && status) {
             start->click();
@@ -184,7 +249,9 @@ int main(int argc, char *argv[])
             settingsDialog->close();
         }
 
-        window.resize(680, 440);
+        window.setTranslatedText(QStringLiteral("这是翻译后的文字"));
+        window.setOriginalText(QStringLiteral("これは原文です"));
+        window.resize(760, 190);
         window.move(40, 50);
         application.processEvents();
         savedWindowGeometry = window.geometry();
@@ -192,17 +259,26 @@ int main(int argc, char *argv[])
         if (original && translation) {
             const QRect originalRect(original->mapTo(&window, QPoint(0, 0)), original->size());
             const QRect translationRect(translation->mapTo(&window, QPoint(0, 0)), translation->size());
-            check(original->width() > 100 && original->height() > 40,
+            check(original->width() > 100 && original->height() > 10,
                   "original text remains usable after resize");
-            check(translation->width() > 100 && translation->height() > 40,
+            check(translation->width() > 100 && translation->height() > 10,
                   "translation text remains usable after resize");
             check(!originalRect.intersects(translationRect), "text areas do not overlap after resize");
         }
 
         const QString screenshotPath = qEnvironmentVariable("TRANSLATOR_SCREENSHOT_PATH");
-        if (!screenshotPath.isEmpty()) {
-            check(window.grab().save(screenshotPath), "UI screenshot is saved");
-        }
+        QCursor::setPos(0, 0);
+        QCoreApplication::sendEvent(&window, &leaveEvent);
+        processEventsFor(180);
+        check(saveWindowScreenshot(window, screenshotPath), "subtitle screenshot is saved");
+
+        const QString toolbarScreenshotPath =
+            qEnvironmentVariable("TRANSLATOR_TOOLBAR_SCREENSHOT_PATH");
+        QCursor::setPos(globalHoverPoint);
+        QCoreApplication::sendEvent(&window, &enterEvent);
+        processEventsFor(80);
+        check(saveWindowScreenshot(window, toolbarScreenshotPath), "toolbar screenshot is saved");
+        QCursor::setPos(initialCursorPosition);
 
         if (closeButton) {
             closeButton->click();

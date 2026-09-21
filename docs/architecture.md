@@ -120,7 +120,9 @@ flowchart TD
     Identity --> Settings[SettingsManager]
     Settings --> Window[TranslationWindow]
     Window --> Toolbar[Toolbar]
-    Window --> Display[Original + Translation Display]
+    Window --> Display[Transparent SubtitleArea]
+    Display --> Translation[Translated QLabel]
+    Display --> Original[Original QLabel]
     Toolbar --> Dialog[SettingsDialog]
     Dialog --> Settings
     Settings --> Store[QSettings]
@@ -139,7 +141,9 @@ flowchart LR
 
 当前稳定 ID 为语言代码 `auto`、`zh`、`en`、`ja`、`ko`，OCR engine 为 `windows_ocr`，Translator 为 `none`。`SettingsManager` 在读取时验证值；缺失、非法或已经移除的 ID 会回退到默认值并写回配置。
 
-`TranslationWindow` 是 `QWidget` 顶层窗口，使用 `Qt::FramelessWindowHint`、`Qt::WindowStaysOnTopHint` 和 `Qt::WA_TranslucentBackground`。工具栏空白区域通过 `QWindow::startSystemMove()` 请求系统移动窗口，按钮区域仍保持正常点击。窗口关闭时用 `saveGeometry()` 写入 `window/geometry`；恢复后若窗口矩形与所有屏幕的 `availableGeometry()` 均不相交，则回退到默认尺寸并居中到主屏。
+`TranslationWindow` 是 `QWidget` 顶层窗口，使用 `Qt::FramelessWindowHint`、`Qt::WindowStaysOnTopHint` 和 `Qt::WA_TranslucentBackground`。主体 `SubtitleArea` 不绘制背景，按“译文在上、原文在下”排列两个自动换行的 `QLabel`，并以高对比文字和轻量阴影保障可读性。半透明工具栏在鼠标进入窗口时显示，离开后延迟检查全窗口命中范围再隐藏，以避免经过子控件时闪烁。
+
+工具栏空白区域和字幕区域通过 `QWindow::startSystemMove()` 请求系统移动窗口，字幕区域边缘使用 `startSystemResize()`。按钮区域仍保持正常点击。窗口关闭时用 `saveGeometry()` 写入 `window/geometry`；恢复后若窗口矩形与所有屏幕的 `availableGeometry()` 均不相交，则回退到默认的宽屏字幕尺寸并居中到主屏。
 
 ## Qt 6/C++ 版本架构
 
