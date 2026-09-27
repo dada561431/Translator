@@ -10,6 +10,8 @@
 #include <QProcessEnvironment>
 #include <QStringList>
 
+#include <utility>
+
 #ifdef Q_OS_WIN
 #include <windows.h>
 #endif
@@ -26,6 +28,7 @@ using SetImageFn = void (*)(TessBaseAPI *, const unsigned char *, int, int, int,
 using GetTextFn = char *(*)(TessBaseAPI *);
 using DeleteTextFn = void (*)(const char *);
 using ClearFn = void (*)(TessBaseAPI *);
+using SetPageSegModeFn = void (*)(TessBaseAPI *, int);
 
 QStringList engineDirectories()
 {
@@ -122,10 +125,17 @@ struct TesseractOcrEngine::Impl
     GetTextFn getText = nullptr;
     DeleteTextFn deleteText = nullptr;
     ClearFn clear = nullptr;
+    SetPageSegModeFn setPageSegMode = nullptr;
     QString libraryPath;
     QString dataDirectory;
     QString initializedLanguages;
     QString loadError;
+    QString configuredDataDirectory;
+
+    explicit Impl(QString tessdataPath)
+        : configuredDataDirectory(std::move(tessdataPath))
+    {
+    }
 
     ~Impl()
     {
@@ -170,7 +180,10 @@ struct TesseractOcrEngine::Impl
         getText = reinterpret_cast<GetTextFn>(library.resolve("TessBaseAPIGetUTF8Text"));
         deleteText = reinterpret_cast<DeleteTextFn>(library.resolve("TessDeleteText"));
         clear = reinterpret_cast<ClearFn>(library.resolve("TessBaseAPIClear"));
-        if (!create || !destroy || !init || !end || !setImage || !getText || !deleteText || !clear) {
+        setPageSegMode = reinterpret_cast<SetPageSegModeFn>(
+            library.resolve("TessBaseAPISetPageSegMode"));
+        if (!create || !destroy || !init || !end || !setImage || !getText
+            || !deleteText || !clear || !setPageSegMode) {
             loadError = QStringLiteral("Tesseract DLL lacks a required C API symbol: %1")
                             .arg(library.errorString());
             library.unload();
@@ -182,13 +195,15 @@ struct TesseractOcrEngine::Impl
             library.unload();
             return false;
         }
-        dataDirectory = findDataDirectory(libraryPath);
+        dataDirectory = configuredDataDirectory.isEmpty()
+            ? findDataDirectory(libraryPath)
+            : QDir(configuredDataDirectory).absolutePath();
         return true;
     }
 };
 
-TesseractOcrEngine::TesseractOcrEngine()
-    : impl_(std::make_unique<Impl>())
+TesseractOcrEngine::TesseractOcrEngine(const QString &tessdataPath)
+    : impl_(std::make_unique<Impl>(tessdataPath))
 {
 }
 
@@ -201,10 +216,18 @@ QString TesseractOcrEngine::id() const
 
 OcrResult TesseractOcrEngine::recognize(const QImage &image, const QString &sourceLanguage)
 {
+    return recognizeWithOptions(image, sourceLanguage, OcrPreprocessOptions());
+}
+
+OcrResult TesseractOcrEngine::recognizeWithOptions(
+    const QImage &image, const QString &sourceLanguage,
+    const OcrPreprocessOptions &options, int pageSegmentationMode)
+{
     QElapsedTimer timer;
     timer.start();
     OcrResult result;
     result.engineId = id();
+    result.inputSize = image.size();
     const auto finish = [&]() {
         result.elapsedMs = timer.elapsed();
         return result;
@@ -238,6 +261,8 @@ OcrResult TesseractOcrEngine::recognize(const QImage &image, const QString &sour
         else
             missing << language;
     }
+    result.tesseractLanguage = requested.join(QLatin1Char('+'));
+    result.tessdataPath = impl_->dataDirectory;
     if (!missing.isEmpty()) {
         result.error = QStringLiteral("Missing Tesseract language data: %1 in %2")
                            .arg(missing.join(QStringLiteral(", ")), impl_->dataDirectory);
@@ -245,6 +270,7 @@ OcrResult TesseractOcrEngine::recognize(const QImage &image, const QString &sour
     }
 
     const QString languages = available.join(QLatin1Char('+'));
+    result.tesseractLanguage = languages;
     if (impl_->initializedLanguages != languages) {
         if (!impl_->initializedLanguages.isEmpty())
             impl_->end(impl_->api);
@@ -259,13 +285,29 @@ OcrResult TesseractOcrEngine::recognize(const QImage &image, const QString &sour
         impl_->initializedLanguages = languages;
     }
 
-    const QImage pixels = image.convertToFormat(QImage::Format_RGB888);
+    const OcrPreprocessResult preprocessing = OcrImagePreprocessor::process(image, options);
+    result.preprocessingMode = preprocessing.mode;
+    result.preprocessingMs = preprocessing.elapsedMs;
+    result.processedSize = preprocessing.image.size();
+    const QImage pixels = preprocessing.image.format() == QImage::Format_Grayscale8
+        ? preprocessing.image
+        : preprocessing.image.convertToFormat(QImage::Format_RGB888);
     if (pixels.isNull()) {
         result.error = QStringLiteral("OCR image conversion failed");
         return finish();
     }
-    impl_->setImage(impl_->api, pixels.constBits(), pixels.width(), pixels.height(), 3, pixels.bytesPerLine());
+    const int psm = pageSegmentationMode > 0
+        ? pageSegmentationMode
+        : OcrImagePreprocessor::selectPageSegmentationMode(image.size());
+    result.pageSegmentationMode = psm;
+    impl_->setPageSegMode(impl_->api, psm);
+    const int bytesPerPixel = pixels.format() == QImage::Format_Grayscale8 ? 1 : 3;
+    impl_->setImage(impl_->api, pixels.constBits(), pixels.width(), pixels.height(),
+                    bytesPerPixel, pixels.bytesPerLine());
+    QElapsedTimer recognitionTimer;
+    recognitionTimer.start();
     char *recognized = impl_->getText(impl_->api);
+    result.recognitionMs = recognitionTimer.elapsed();
     if (!recognized) {
         impl_->clear(impl_->api);
         result.error = QStringLiteral("Tesseract recognition failed");

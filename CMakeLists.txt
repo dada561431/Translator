@@ -29,6 +29,8 @@ add_executable(Translator
     src/gui/TranslationWindow.cpp
     src/gui/TranslationWindow.h
     src/ocr/IOcrEngine.h
+    src/ocr/OcrImagePreprocessor.cpp
+    src/ocr/OcrImagePreprocessor.h
     src/ocr/OcrTypes.h
     src/ocr/TesseractOcrEngine.cpp
     src/ocr/TesseractOcrEngine.h
@@ -107,4 +109,48 @@ if(BUILD_TESTING)
     set_tests_properties(phase4_ocr_logic PROPERTIES
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
     )
+
+    add_executable(TranslatorPhase41Tests
+        tests/Phase41OcrTuningTest.cpp
+        src/ocr/IOcrEngine.h
+        src/ocr/OcrImagePreprocessor.cpp
+        src/ocr/OcrImagePreprocessor.h
+        src/ocr/OcrTypes.h
+        src/ocr/TesseractOcrEngine.cpp
+        src/ocr/TesseractOcrEngine.h
+    )
+    target_include_directories(TranslatorPhase41Tests PRIVATE src)
+    target_link_libraries(TranslatorPhase41Tests PRIVATE Qt6::Core Qt6::Gui)
+    add_test(NAME phase41_ocr_tuning COMMAND TranslatorPhase41Tests)
+
+    add_executable(TranslatorOcrBenchmark
+        tests/OcrBenchmark.cpp
+        src/ocr/IOcrEngine.h
+        src/ocr/OcrImagePreprocessor.cpp
+        src/ocr/OcrImagePreprocessor.h
+        src/ocr/OcrTypes.h
+        src/ocr/TesseractOcrEngine.cpp
+        src/ocr/TesseractOcrEngine.h
+    )
+    target_include_directories(TranslatorOcrBenchmark PRIVATE src)
+    target_link_libraries(TranslatorOcrBenchmark PRIVATE Qt6::Core Qt6::Gui)
+
+    add_executable(TranslatorOcrSampleGenerator
+        tests/OcrSampleGenerator.cpp
+    )
+    target_link_libraries(TranslatorOcrSampleGenerator PRIVATE Qt6::Core Qt6::Gui)
+
+    add_executable(TranslatorScreenOcrProbe
+        tests/ScreenOcrProbe.cpp
+        src/capture/ScreenCaptureService.cpp
+        src/capture/ScreenCaptureService.h
+        src/ocr/IOcrEngine.h
+        src/ocr/OcrImagePreprocessor.cpp
+        src/ocr/OcrImagePreprocessor.h
+        src/ocr/OcrTypes.h
+        src/ocr/TesseractOcrEngine.cpp
+        src/ocr/TesseractOcrEngine.h
+    )
+    target_include_directories(TranslatorScreenOcrProbe PRIVATE src)
+    target_link_libraries(TranslatorScreenOcrProbe PRIVATE Qt6::Core Qt6::Gui)
 endif()

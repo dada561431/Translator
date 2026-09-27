@@ -2,7 +2,7 @@
 
 ## 范围
 
-本文基于当前仓库源码的实际调用关系，记录 LunaTranslator 的核心架构，并给出 Translator 的 Qt 6/C++ 模块边界。Phase 1 建立了可配置、可编译、可启动的 Qt Widgets 骨架；Phase 2 增加基础翻译界面和设置持久化；Phase 3 加入单帧屏幕捕获；Phase 4 加入单帧 OCR。翻译后端、Hook、TTS 和完整实时管线仍未实现。
+本文基于当前仓库源码的实际调用关系，记录 LunaTranslator 的核心架构，并给出 Translator 的 Qt 6/C++ 模块边界。Phase 1 建立了可配置、可编译、可启动的 Qt Widgets 骨架；Phase 2 增加基础翻译界面和设置持久化；Phase 3 加入单帧屏幕捕获；Phase 4 加入单帧 OCR；Phase 4.1 增加 OCR 预处理与字幕参数调优。翻译后端、Hook、TTS 和完整实时管线仍未实现。
 
 ## 原项目架构
 
@@ -148,7 +148,7 @@ flowchart LR
 
 `TranslationWindow` 是 `QWidget` 顶层窗口，使用 `Qt::FramelessWindowHint`、`Qt::WindowStaysOnTopHint` 和 `Qt::WA_TranslucentBackground`。主体 `SubtitleArea` 不绘制背景，按“译文在上、原文在下”排列两个自动换行的 `QLabel`，并以高对比文字和轻量阴影保障可读性。半透明工具栏在鼠标进入窗口时显示，离开后延迟检查全窗口命中范围再隐藏，以避免经过子控件时闪烁。
 
-为避免透明空窗口在启动时无法发现，两个字幕字段各自维护 UI placeholder 状态并初始显示位置提示文字。Toolbar 启动时隐藏，鼠标进入整个窗口区域时显示，离开后延迟 400ms 检查全局光标是否确实位于窗口外。任一 setter 首次收到非空文本时只替换对应字段的 placeholder；placeholder 不写入 `SettingsManager` 或后续业务数据流。
+为避免透明空窗口在启动时无法发现，两个字幕字段各自维护 UI placeholder 状态并初始显示位置提示文字。Toolbar 启动时可见；进入真实字幕状态后，鼠标进入整个窗口区域时显示，离开后延迟 400ms 检查全局光标是否确实位于窗口外。任一 setter 首次收到非空文本时只替换对应字段的 placeholder；placeholder 不写入 `SettingsManager` 或后续业务数据流。
 
 工具栏空白区域和字幕区域通过 `QWindow::startSystemMove()` 请求系统移动窗口，字幕区域边缘使用 `startSystemResize()`。按钮区域仍保持正常点击。窗口关闭时用 `saveGeometry()` 写入 `window/geometry`；恢复后若窗口矩形与所有屏幕的 `availableGeometry()` 均不相交，则回退到默认的宽屏字幕尺寸并居中到主屏。
 
@@ -214,7 +214,8 @@ The current Qt path extends the Phase 3 one-shot capture flow:
 flowchart LR
     Region[Region selection] --> Capture[ScreenCaptureService]
     Capture -->|CaptureResult.image| Coordinator[OcrCoordinator]
-    Coordinator -->|IOcrEngine.recognize| Tesseract[Tesseract backend]
+    Coordinator -->|IOcrEngine.recognize| Preprocessor[OcrImagePreprocessor]
+    Preprocessor -->|processed QImage| Tesseract[Tesseract backend]
     Tesseract -->|OcrResult| Signal[resultReady]
     Signal -->|valid text, including empty| Original[TranslationWindow.setOriginalText]
 ```
@@ -231,16 +232,33 @@ has been replaced; it is not a translation.
 
 Settings use stable source-language IDs `auto`, `zh`, `en`, `ja`, and `ko`.
 The first backend is Tesseract (`tesseract`); `auto` currently maps to `eng` as
-a fallback, without language detection. The Tesseract runtime and corresponding
-trained data must be present for real recognition. The development machine has
-Tesseract 5.4 with `eng` and `osd` trained data only; Chinese, Japanese, and
-Korean recognition has not been verified. Dependency packaging and
-trained-data distribution are pending Lead confirmation. The Phase 4 automated
-test uses a deterministic, test-only `FakeOcrEngine` to exercise the contract,
-coordinator signal, invalid and blank image results, and original subtitle
-setter without relying on installed OCR data. Phase 2 and 3 CTest targets remain
-in the suite. Real-display capture and recognition need separate manual
-verification; no such manual pass is implied here.
+a fallback, without language detection. `zh`, `en`, `ja`, and `ko` map to
+`chi_sim`, `eng`, `jpn`, and `kor`. Missing trained data produces a specific
+error rather than an empty successful result.
+
+Phase 4.1 keeps preprocessing inside `src/ocr/`: the source `QImage` is copied,
+optionally enlarged with `Qt::SmoothTransformation`, converted to
+`QImage::Format_Grayscale8`, and contrast-stretched between the 1st and 99th
+histogram percentiles. Images below 45 logical pixels use 3x; images below 120
+use 2x; larger images remain at 1x. No mandatory threshold/binarization is
+applied because it damages anti-aliasing, outlines, shadows, and colored text.
+Wide regions with aspect ratio at least 5 and height at most 110 select PSM 7;
+taller or less-wide regions select PSM 6 for possible multi-line text.
+
+`TesseractOcrEngine` owns one API instance, reuses it for repeated requests in
+the same language, and reinitializes only when the language changes. `OcrResult`
+records requested Tesseract language, tessdata path, input/processed sizes,
+preprocessing mode, PSM, preprocessing/OCR/total elapsed times, text, and error.
+Debug builds print these fields and recognized text; Release does not log full
+recognized text through this diagnostic path. `ScreenCaptureService` remains a
+capture-only component and never enhances OCR pixels.
+
+The deterministic Phase 4.1 suite tests image immutability, scaling, grayscale,
+contrast safety, empty input, PSM selection, and missing language data. Manual
+fixed-font and real Bilibili video results are recorded in
+`docs/ocr-accuracy-phase41.md`. They support Tesseract for clean ordinary text
+but also show that scene-text/outlined/artistic subtitles require evaluation of
+an additional backend such as PaddleOCR in a later phase.
 
 ## Native Dependencies
 

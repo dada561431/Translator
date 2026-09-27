@@ -2,7 +2,7 @@
 
 `Translator` 是一个基于 Qt 6、C++17 和 Qt Widgets 的实时屏幕文字识别与翻译程序。本项目参考 LunaTranslator 的架构和功能设计，但采用独立的 Qt 6/C++ 实现；原 LunaTranslator 源码保持独立且不受本工程影响。
 
-## Phase 4 OCR status
+## Phase 4.1 OCR accuracy status
 
 Phase 4 adds a single-frame OCR path after Region capture. A successful capture
 produces a `CaptureResult::image`; `OcrCoordinator` passes that image and the
@@ -14,16 +14,29 @@ translation: Start/Stop remains a UI state control, and the translated subtitle
 still has no translation backend.
 
 The initial backend is Tesseract (`tesseract` engine ID). Language IDs are
-`auto`, `zh`, `en`, `ja`, and `ko`; Phase 4 specifies `auto` as an English `eng`
-fallback, not source-language detection. On the current development machine,
-Tesseract 5.4 is installed with only `eng` and `osd` trained data; Chinese,
-Japanese, and Korean recognition have not been verified. Runtime and matching
-trained data are required on other machines. Packaging and trained-data
-distribution are pending Lead confirmation.
+`auto`, `zh`, `en`, `ja`, and `ko`; `auto` is an English `eng` fallback, not
+source-language detection. Phase 4.1 adds a Qt-only OCR preprocessor, conditional
+2x/3x smooth scaling, grayscale conversion, percentile contrast stretching,
+subtitle-oriented PSM 6/7 selection, explicit trained-data errors, and detailed
+Debug diagnostics. It does not force binary thresholding and does not add
+OpenCV or another OCR runtime.
 
-Automated verification uses a test-only `FakeOcrEngine` and the
-`phase4_ocr_logic` CTest target; it does not require Tesseract. Run all existing
-Phase 2, Phase 3, and Phase 4 checks with:
+Tesseract 5.4 was manually verified with `eng` and `chi_sim`. The Japanese and
+Korean language mappings (`jpn`, `kor`) and missing-model diagnostics exist, but
+Japanese/Korean recognition quality has not been verified. Runtime and matching
+trained data are required on other machines. Packaging and trained-data
+distribution remain future work.
+
+Automated verification includes the Phase 2/3/4 regression suites and the
+`phase41_ocr_tuning` preprocessor/PSM/error suite. Manual tools generate
+temporary fixed-font samples and compare the same image with original RGB and
+optimized preprocessing. Real Bilibili subtitle tests found improvement on
+small ordinary text but poor reliability on artistic text, outlines, and
+complex moving backgrounds. See `docs/ocr-accuracy-phase41.md`. PaddleOCR or
+another scene-text backend should be evaluated later; it is not implemented in
+this phase.
+
+Run all checks with:
 
 ```powershell
 cmake -S . -B .\build\mingw -G Ninja -DCMAKE_PREFIX_PATH="<Qt6 install prefix>"
@@ -31,13 +44,14 @@ cmake --build .\build\mingw
 ctest --test-dir .\build\mingw --output-on-failure
 ```
 
-Manual checks on a real display with installed Tesseract and trained data are
-still required; automated tests do not establish recognition quality or actual
-screen-capture behavior on every DPI configuration.
+Automated tests do not establish recognition quality on every font, video, or
+DPI configuration. `TranslatorOcrBenchmark` and
+`TranslatorOcrSampleGenerator` are manual test tools, not production pipeline
+components.
 
 ## 当前阶段
 
-当前为 Phase 4：在区域选择与单帧屏幕捕获后执行一次 OCR。
+当前为 Phase 4.1：保留区域选择与单帧 OCR，并优化字幕 OCR 的预处理、PSM 和可观测性。
 
 已实现：
 
@@ -59,6 +73,9 @@ screen-capture behavior on every DPI configuration.
 - 上次有效 Region 与显示器名称持久化，失效区域启动时安全忽略
 - Qt 逻辑坐标和 High-DPI 截图像素尺寸记录
 - 可替换的 OCR 接口、Tesseract 后端和异步 `OcrCoordinator`
+- OCR 层内的放大、灰度化和对比度拉伸预处理
+- 面向单行/多行字幕的 PSM 7/6 动态选择
+- 输入/处理尺寸、语言资源、预处理和耗时 Debug 诊断
 - OCR 有效结果更新原文字幕；空结果可清除先前原文
 
 ## 尚未实现
@@ -79,7 +96,7 @@ Region 按钮会选择并截取一次屏幕区域，然后发起一次本地 OCR
 
 启动时译文和原文位置分别显示 `实时翻译将在这里显示` 与 `Original text appears here`，用于标示悬浮窗位置，不进入配置或业务管线。每个字段在首次收到非空真实内容时独立替换自己的 placeholder。
 
-半透明工具栏启动时隐藏，鼠标进入整个悬浮窗时显示，真正离开窗口 400ms 后隐藏；placeholder 始终可见，因此窗口仍可被发现。窗口通过 Qt 原生 `QWindow::startSystemMove()` 支持从工具栏空白处或字幕区域拖动，并通过 `startSystemResize()` 支持边缘缩放。当前不启用鼠标穿透。
+半透明工具栏启动时可见；进入真实字幕状态后，鼠标进入整个悬浮窗时显示，真正离开窗口 400ms 后隐藏。placeholder 始终可见，因此窗口仍可被发现。窗口通过 Qt 原生 `QWindow::startSystemMove()` 支持从工具栏空白处或字幕区域拖动，并通过 `startSystemResize()` 支持边缘缩放。当前不启用鼠标穿透。
 
 `TranslationWindow` 通过 `regionSelectionRequested()` 请求选区，`CaptureCoordinator` 隐藏悬浮窗并启动 `RegionSelector`。选区 overlay 关闭后延迟一次短暂合成周期，再由 `ScreenCaptureService` 截取 `CaptureResult::image`，最后恢复悬浮窗。截图仅在单个 `QScreen` 内进行，不支持跨不同 DPI 显示器拖出一个区域。
 

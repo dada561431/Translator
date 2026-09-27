@@ -67,11 +67,27 @@ void OcrCoordinator::recognize(const CaptureResult &capture,
     QMetaObject::invokeMethod(worker, [coordinator, worker, request, image, sourceLanguage] {
         const OcrResult result = worker->recognize(image, sourceLanguage);
 #ifndef NDEBUG
-        qDebug() << "[OCR] engine:" << result.engineId
-                 << "input size:" << image.size()
-                 << "sourceLanguage:" << sourceLanguage
-                 << "elapsed:" << result.elapsedMs
-                 << "text:" << result.text;
+        qDebug().noquote()
+            << QStringLiteral("[OCR]\n"
+                              "engine = %1\n"
+                              "sourceLanguage = %2\n"
+                              "tesseractLanguage = %3\n"
+                              "tessdata = %4\n"
+                              "input = %5x%6\n"
+                              "processed = %7x%8\n"
+                              "preprocess = %9 (%10 ms)\n"
+                              "psm = %11\n"
+                              "ocr = %12 ms\n"
+                              "elapsed = %13 ms\n"
+                              "text = \"%14\"\n"
+                              "error = \"%15\"")
+                   .arg(result.engineId, sourceLanguage,
+                        result.tesseractLanguage, result.tessdataPath)
+                   .arg(result.inputSize.width()).arg(result.inputSize.height())
+                   .arg(result.processedSize.width()).arg(result.processedSize.height())
+                   .arg(result.preprocessingMode).arg(result.preprocessingMs)
+                   .arg(result.pageSegmentationMode).arg(result.recognitionMs)
+                   .arg(result.elapsedMs).arg(result.text, result.error);
 #endif
         if (coordinator) {
             QMetaObject::invokeMethod(coordinator, [coordinator, request, result] {
