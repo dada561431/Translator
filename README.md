@@ -2,9 +2,42 @@
 
 `Translator` 是一个基于 Qt 6、C++17 和 Qt Widgets 的实时屏幕文字识别与翻译程序。本项目参考 LunaTranslator 的架构和功能设计，但采用独立的 Qt 6/C++ 实现；原 LunaTranslator 源码保持独立且不受本工程影响。
 
+## Phase 4 OCR status
+
+Phase 4 adds a single-frame OCR path after Region capture. A successful capture
+produces a `CaptureResult::image`; `OcrCoordinator` passes that image and the
+configured source-language ID to an `IOcrEngine` on a worker thread and emits an
+`OcrResult`. Valid recognized text, including an empty result, is passed to
+`TranslationWindow::setOriginalText()`; an empty result clears prior original
+text after the placeholder has been replaced. This is not continuous capture or
+translation: Start/Stop remains a UI state control, and the translated subtitle
+still has no translation backend.
+
+The initial backend is Tesseract (`tesseract` engine ID). Language IDs are
+`auto`, `zh`, `en`, `ja`, and `ko`; Phase 4 specifies `auto` as an English `eng`
+fallback, not source-language detection. On the current development machine,
+Tesseract 5.4 is installed with only `eng` and `osd` trained data; Chinese,
+Japanese, and Korean recognition have not been verified. Runtime and matching
+trained data are required on other machines. Packaging and trained-data
+distribution are pending Lead confirmation.
+
+Automated verification uses a test-only `FakeOcrEngine` and the
+`phase4_ocr_logic` CTest target; it does not require Tesseract. Run all existing
+Phase 2, Phase 3, and Phase 4 checks with:
+
+```powershell
+cmake -S . -B .\build\mingw -G Ninja -DCMAKE_PREFIX_PATH="<Qt6 install prefix>"
+cmake --build .\build\mingw
+ctest --test-dir .\build\mingw --output-on-failure
+```
+
+Manual checks on a real display with installed Tesseract and trained data are
+still required; automated tests do not establish recognition quality or actual
+screen-capture behavior on every DPI configuration.
+
 ## 当前阶段
 
-当前为 Phase 3：区域选择与单帧屏幕捕获。
+当前为 Phase 4：在区域选择与单帧屏幕捕获后执行一次 OCR。
 
 已实现：
 
@@ -25,17 +58,18 @@
 - 基于 `QScreen::grabWindow()` 的一次性截图，得到 `QImage`
 - 上次有效 Region 与显示器名称持久化，失效区域启动时安全忽略
 - Qt 逻辑坐标和 High-DPI 截图像素尺寸记录
+- 可替换的 OCR 接口、Tesseract 后端和异步 `OcrCoordinator`
+- OCR 有效结果更新原文字幕；空结果可清除先前原文
 
 ## 尚未实现
 
-- OCR backend
 - Translation backend
 - Continuous capture / Real-time pipeline
 - Overlay click-through
 - Hook
 - TTS
 
-Region 按钮现在会实际选择并截取一次屏幕区域，不会发起 OCR、翻译或网络请求。取消选择不会覆盖上次有效 Region。Debug 构建仅在本机系统临时目录覆盖保存一张 `Translator/last_capture.png` 供验证；Release 构建不写这张调试图。截图不会上传或写入仓库。
+Region 按钮会选择并截取一次屏幕区域，然后发起一次本地 OCR；不会发起翻译或网络请求。取消选择不会覆盖上次有效 Region。Debug 构建仅在本机系统临时目录覆盖保存一张 `Translator/last_capture.png` 供验证；Release 构建不写这张调试图。截图不会上传或写入仓库。
 
 ## 当前 UI 架构
 
@@ -51,10 +85,10 @@ Region 按钮现在会实际选择并截取一次屏幕区域，不会发起 OCR
 
 ## 构建
 
-需要 CMake、Ninja、支持 C++17 的编译器，以及包含 Core、Gui、Widgets 组件的 Qt 6 开发环境。Qt 安装位置通过标准 CMake 机制发现；必要时由构建者在命令行设置 `CMAKE_PREFIX_PATH` 或 `Qt6_DIR`，工程本身不硬编码本机安装路径。
+需要 CMake、Ninja、支持 C++17 的编译器，以及包含 Core、Gui、Widgets 组件的 Qt 6 开发环境。Qt 安装位置通过标准 CMake 机制发现；必要时由构建者在命令行设置 `CMAKE_PREFIX_PATH` 或 `Qt6_DIR`，也可使用环境变量 `CMAKE_PREFIX_PATH`。Windows 上构建和运行时还需让对应 MinGW 与 Qt 的 `bin` 目录可从 `PATH` 找到。工程本身不硬编码本机安装路径。
 
 ```powershell
-cmake -S . -B .\build\mingw -G Ninja
+cmake -S . -B .\build\mingw -G Ninja -DCMAKE_PREFIX_PATH="<Qt6 install prefix>"
 cmake --build .\build\mingw
 ```
 

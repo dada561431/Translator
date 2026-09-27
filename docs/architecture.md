@@ -2,7 +2,7 @@
 
 ## 范围
 
-本文基于当前仓库源码的实际调用关系，记录 LunaTranslator 的核心架构，并给出 Translator 的 Qt 6/C++ 模块边界。Phase 1 建立了可配置、可编译、可启动的 Qt Widgets 骨架；Phase 2 增加基础翻译界面和设置持久化。OCR、屏幕捕获、翻译后端、Hook、TTS 和完整实时管线仍不在当前实现范围内。
+本文基于当前仓库源码的实际调用关系，记录 LunaTranslator 的核心架构，并给出 Translator 的 Qt 6/C++ 模块边界。Phase 1 建立了可配置、可编译、可启动的 Qt Widgets 骨架；Phase 2 增加基础翻译界面和设置持久化；Phase 3 加入单帧屏幕捕获；Phase 4 加入单帧 OCR。翻译后端、Hook、TTS 和完整实时管线仍未实现。
 
 ## 原项目架构
 
@@ -144,7 +144,7 @@ flowchart LR
     Manager --> Store[QSettings]
 ```
 
-当前稳定 ID 为语言代码 `auto`、`zh`、`en`、`ja`、`ko`，OCR engine 为 `windows_ocr`，Translator 为 `none`。`SettingsManager` 在读取时验证值；缺失、非法或已经移除的 ID 会回退到默认值并写回配置。
+当前稳定 ID 为语言代码 `auto`、`zh`、`en`、`ja`、`ko`，OCR engine 为 `tesseract`，Translator 为 `none`。`SettingsManager` 在读取时验证值；缺失、非法或已经移除的 ID 会回退到默认值并写回配置。
 
 `TranslationWindow` 是 `QWidget` 顶层窗口，使用 `Qt::FramelessWindowHint`、`Qt::WindowStaysOnTopHint` 和 `Qt::WA_TranslucentBackground`。主体 `SubtitleArea` 不绘制背景，按“译文在上、原文在下”排列两个自动换行的 `QLabel`，并以高对比文字和轻量阴影保障可读性。半透明工具栏在鼠标进入窗口时显示，离开后延迟检查全窗口命中范围再隐藏，以避免经过子控件时闪烁。
 
@@ -178,16 +178,16 @@ flowchart LR
 | `src/gui/` | 悬浮翻译窗口、设置界面及后续 overlay 交互 | 已实现 `TranslationWindow` 与 `SettingsDialog` |
 | `src/capture/` | 区域选择、Qt 单帧截图及结果模型 | 已实现 `RegionSelector` 与 `ScreenCaptureService` |
 | `src/textsource/` | `ITextSource` 及 OCR/剪贴板/Hook 等来源 | 未实现 |
-| `src/ocr/` | `IOcrEngine`、结果模型与引擎选择 | 未实现 |
+| `src/ocr/` | `IOcrEngine`、结果模型与引擎选择 | 已实现接口与首个 Tesseract 后端 |
 | `src/processing/` | 源文本预处理、翻译前后处理和管线编排 | 未实现 |
 | `src/translator/` | `ITranslator`、调度、缓存与后端 | 未实现 |
 | `src/config/` | 配置模型、校验、迁移和持久化 | 已实现基础 `SettingsManager`/`QSettings` |
 
-Phase 3 仍不为后续 OCR、翻译或实时管线边界创建空类。当前构建目标只包含已经实际使用的 GUI、配置和捕获代码。
+Phase 3 未为后续 OCR、翻译或实时管线边界创建空类；Phase 4 才加入 OCR 接口、后端与协调器。翻译和实时管线仍待后续阶段。
 
 ### 建议运行时关系
 
-Phase 4 可直接消费 `CaptureResult::image` 作为 OCR 输入，再将识别文本送到 `TranslationWindow::setOriginalText()`。后续翻译结果进入 `setTranslatedText()`。GUI 不应直接选择 native DLL 或调用具体服务；OCR/翻译编排类型等真正接入后端时再建立。
+Phase 4 消费 `CaptureResult::image` 作为 OCR 输入，再将有效的识别文本（包括空文本）送到 `TranslationWindow::setOriginalText()`；空文本可清除之前显示的原文。后续翻译结果才会进入 `setTranslatedText()`；GUI 不直接调用具体 OCR 后端。
 
 ## 原模块到新模块映射
 
@@ -205,6 +205,42 @@ Phase 4 可直接消费 `CaptureResult::image` 作为 OCR 输入，再将识别�
 | `myutils/config.py`、默认 JSON | `src/config/` | 使用 `QJsonDocument`/`QSettings` 或明确 JSON schema；保留原子写入和迁移 |
 | `NativeUtils.py`、`windows.py` | `src/capture/` 及后续 `src/platform/windows/` | 用 RAII C++ 封装 Win32 句柄和回调，平台代码与领域接口隔离 |
 | `NativeImpl/LunaHook` | 后续独立 Hook adapter | 作为可选 Windows 子系统评估，不在 Phase 1 链接 |
+
+## Phase 4 OCR implementation
+
+The current Qt path extends the Phase 3 one-shot capture flow:
+
+```mermaid
+flowchart LR
+    Region[Region selection] --> Capture[ScreenCaptureService]
+    Capture -->|CaptureResult.image| Coordinator[OcrCoordinator]
+    Coordinator -->|IOcrEngine.recognize| Tesseract[Tesseract backend]
+    Tesseract -->|OcrResult| Signal[resultReady]
+    Signal -->|valid text, including empty| Original[TranslationWindow.setOriginalText]
+```
+
+`CaptureCoordinator` owns selection and capture and emits `captureCompleted` only
+after a valid frame is captured. `OcrCoordinator` owns the worker thread, accepts
+the image and source-language ID, and emits `resultReady` on the GUI thread. It
+keeps a request number so an older queued result cannot replace the most recent
+one. The OCR contract is `IOcrEngine::id()` and
+`recognize(const QImage &, const QString &sourceLanguage)`; `OcrResult` contains
+`text`, `engineId`, `error`, `elapsedMs`, and `isValid()` (an empty error means
+valid). A valid empty result clears earlier original text after the placeholder
+has been replaced; it is not a translation.
+
+Settings use stable source-language IDs `auto`, `zh`, `en`, `ja`, and `ko`.
+The first backend is Tesseract (`tesseract`); `auto` currently maps to `eng` as
+a fallback, without language detection. The Tesseract runtime and corresponding
+trained data must be present for real recognition. The development machine has
+Tesseract 5.4 with `eng` and `osd` trained data only; Chinese, Japanese, and
+Korean recognition has not been verified. Dependency packaging and
+trained-data distribution are pending Lead confirmation. The Phase 4 automated
+test uses a deterministic, test-only `FakeOcrEngine` to exercise the contract,
+coordinator signal, invalid and blank image results, and original subtitle
+setter without relying on installed OCR data. Phase 2 and 3 CTest targets remain
+in the suite. Real-display capture and recognition need separate manual
+verification; no such manual pass is implied here.
 
 ## Native Dependencies
 

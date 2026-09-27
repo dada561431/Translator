@@ -15,7 +15,7 @@ const QString kCaptureScreenKey = QStringLiteral("capture/screen");
 
 const QString kDefaultSourceLanguage = QStringLiteral("auto");
 const QString kDefaultTargetLanguage = QStringLiteral("zh");
-const QString kDefaultOcrEngine = QStringLiteral("windows_ocr");
+const QString kDefaultOcrEngine = QStringLiteral("tesseract");
 const QString kDefaultTranslator = QStringLiteral("none");
 
 const QStringList kSourceLanguages = {
@@ -33,7 +33,7 @@ const QStringList kTargetLanguages = {
     QStringLiteral("ko"),
 };
 
-const QStringList kOcrEngines = {QStringLiteral("windows_ocr")};
+const QStringList kOcrEngines = {QStringLiteral("tesseract")};
 const QStringList kTranslators = {QStringLiteral("none")};
 
 } // namespace

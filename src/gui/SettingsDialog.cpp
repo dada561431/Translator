@@ -38,7 +38,7 @@ void SettingsDialog::createUi()
 
     sourceLanguageCombo_ = new QComboBox(this);
     sourceLanguageCombo_->setObjectName(QStringLiteral("sourceLanguageCombo"));
-    sourceLanguageCombo_->addItem(tr("Auto Detect"), QStringLiteral("auto"));
+    sourceLanguageCombo_->addItem(tr("Auto (English OCR)"), QStringLiteral("auto"));
     sourceLanguageCombo_->addItem(tr("Chinese"), QStringLiteral("zh"));
     sourceLanguageCombo_->addItem(tr("English"), QStringLiteral("en"));
     sourceLanguageCombo_->addItem(tr("Japanese"), QStringLiteral("ja"));
@@ -53,7 +53,7 @@ void SettingsDialog::createUi()
 
     ocrEngineCombo_ = new QComboBox(this);
     ocrEngineCombo_->setObjectName(QStringLiteral("ocrEngineCombo"));
-    ocrEngineCombo_->addItem(tr("Windows OCR"), QStringLiteral("windows_ocr"));
+    ocrEngineCombo_->addItem(tr("Tesseract"), QStringLiteral("tesseract"));
 
     translatorCombo_ = new QComboBox(this);
     translatorCombo_->setObjectName(QStringLiteral("translatorCombo"));

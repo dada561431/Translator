@@ -10,9 +10,14 @@ class TranslationWindow;
 
 class CaptureCoordinator final : public QObject
 {
+    Q_OBJECT
+
 public:
     CaptureCoordinator(TranslationWindow &window, SettingsManager &settings,
                        QObject *parent = nullptr);
+
+signals:
+    void captureCompleted(const CaptureResult &result);
 
 private:
     void beginSelection();

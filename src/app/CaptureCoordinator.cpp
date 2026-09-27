@@ -84,6 +84,7 @@ void CaptureCoordinator::captureSelectedRegion(const QRect &region, QScreen *scr
 
     restoreWindow(QStringLiteral("Region selected: %1 x %2")
                       .arg(region.width()).arg(region.height()));
+    emit captureCompleted(result);
 }
 
 void CaptureCoordinator::restoreWindow(const QString &feedback)

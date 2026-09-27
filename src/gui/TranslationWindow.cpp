@@ -57,7 +57,6 @@ TranslationWindow::TranslationWindow(SettingsManager &settings, QWidget *parent)
 
     settingsDialog_ = new SettingsDialog(settings_, this);
     restoreWindowGeometry();
-    toolbar_->hide();
 }
 
 void TranslationWindow::setTranslatedText(const QString &text)

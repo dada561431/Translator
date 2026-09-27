@@ -16,6 +16,8 @@ add_executable(Translator
     src/main.cpp
     src/app/CaptureCoordinator.cpp
     src/app/CaptureCoordinator.h
+    src/app/OcrCoordinator.cpp
+    src/app/OcrCoordinator.h
     src/capture/RegionSelector.cpp
     src/capture/RegionSelector.h
     src/capture/ScreenCaptureService.cpp
@@ -26,6 +28,10 @@ add_executable(Translator
     src/gui/SettingsDialog.h
     src/gui/TranslationWindow.cpp
     src/gui/TranslationWindow.h
+    src/ocr/IOcrEngine.h
+    src/ocr/OcrTypes.h
+    src/ocr/TesseractOcrEngine.cpp
+    src/ocr/TesseractOcrEngine.h
 )
 
 target_include_directories(Translator PRIVATE src)
@@ -79,6 +85,26 @@ if(BUILD_TESTING)
     target_link_libraries(TranslatorPhase3Tests PRIVATE Qt6::Core Qt6::Gui Qt6::Widgets)
     add_test(NAME phase3_capture_logic COMMAND TranslatorPhase3Tests)
     set_tests_properties(phase3_capture_logic PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    )
+
+    add_executable(TranslatorPhase4Tests
+        tests/Phase4OcrTest.cpp
+        src/app/OcrCoordinator.cpp
+        src/app/OcrCoordinator.h
+        src/config/SettingsManager.cpp
+        src/config/SettingsManager.h
+        src/gui/SettingsDialog.cpp
+        src/gui/SettingsDialog.h
+        src/gui/TranslationWindow.cpp
+        src/gui/TranslationWindow.h
+        src/ocr/IOcrEngine.h
+        src/ocr/OcrTypes.h
+    )
+    target_include_directories(TranslatorPhase4Tests PRIVATE src)
+    target_link_libraries(TranslatorPhase4Tests PRIVATE Qt6::Core Qt6::Gui Qt6::Widgets)
+    add_test(NAME phase4_ocr_logic COMMAND TranslatorPhase4Tests)
+    set_tests_properties(phase4_ocr_logic PROPERTIES
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
     )
 endif()

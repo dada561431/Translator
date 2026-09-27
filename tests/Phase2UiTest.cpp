@@ -114,7 +114,7 @@ int main(int argc, char *argv[])
         SettingsManager settings;
         check(settings.sourceLanguage() == QStringLiteral("auto"), "source defaults to auto");
         check(settings.targetLanguage() == QStringLiteral("zh"), "target defaults to zh");
-        check(settings.ocrEngine() == QStringLiteral("windows_ocr"), "OCR defaults to windows_ocr");
+        check(settings.ocrEngine() == QStringLiteral("tesseract"), "OCR defaults to tesseract");
         check(settings.translator() == QStringLiteral("none"), "translator defaults to none");
 
         TranslationWindow window(settings);
@@ -163,7 +163,7 @@ int main(int argc, char *argv[])
               "translated subtitle has greater visual weight");
         check(status && status->text().isEmpty() && !status->isVisible(),
               "status does not permanently occupy subtitle space");
-        check(toolbar && !toolbar->isVisible(), "toolbar is hidden at startup");
+        check(toolbar && toolbar->isVisible(), "toolbar is visible at startup");
 
         const QPoint translatedPositionWithoutToolbar =
             translation ? translation->mapTo(&window, QPoint()) : QPoint();
@@ -284,8 +284,8 @@ int main(int argc, char *argv[])
             check(target && target->findData(QStringLiteral("en")) >= 0, "target includes en ID");
             check(target && target->findData(QStringLiteral("ja")) >= 0, "target includes ja ID");
             check(target && target->findData(QStringLiteral("ko")) >= 0, "target includes ko ID");
-            check(ocr && ocr->currentData().toString() == QStringLiteral("windows_ocr"),
-                  "OCR uses windows_ocr ID");
+            check(ocr && ocr->currentData().toString() == QStringLiteral("tesseract"),
+                  "OCR uses tesseract ID");
             check(translator && translator->currentData().toString() == QStringLiteral("none"),
                   "translator uses none ID");
 
@@ -358,8 +358,8 @@ int main(int argc, char *argv[])
 
         check(restoredSettings.sourceLanguage() == QStringLiteral("ja"), "source ja persists across restart");
         check(restoredSettings.targetLanguage() == QStringLiteral("en"), "target en persists across restart");
-        check(restoredSettings.ocrEngine() == QStringLiteral("windows_ocr"),
-              "OCR engine persists as windows_ocr");
+        check(restoredSettings.ocrEngine() == QStringLiteral("tesseract"),
+              "OCR engine persists as tesseract");
         check(restoredSettings.translator() == QStringLiteral("none"), "translator persists as none");
         check(restoredWindow.size() == savedWindowGeometry.size(), "window size restores across restart");
         check(restoredWindow.pos() == savedWindowGeometry.topLeft(), "window position restores across restart");
@@ -381,6 +381,19 @@ int main(int argc, char *argv[])
     }
 
     {
+        QSettings legacySettings;
+        legacySettings.setValue(QStringLiteral("ocr/engine"), QStringLiteral("windows_ocr"));
+        legacySettings.sync();
+
+        SettingsManager migratedSettings;
+        check(migratedSettings.ocrEngine() == QStringLiteral("tesseract"),
+              "legacy Windows OCR setting migrates to tesseract");
+        QSettings storedSettings;
+        check(storedSettings.value(QStringLiteral("ocr/engine")).toString() == QStringLiteral("tesseract"),
+              "migrated OCR engine ID is written back");
+    }
+
+    {
         QSettings invalidSettings;
         invalidSettings.setValue(QStringLiteral("language/source"), QStringLiteral("invalid"));
         invalidSettings.setValue(QStringLiteral("language/target"), QStringLiteral("invalid"));
@@ -391,8 +404,8 @@ int main(int argc, char *argv[])
         SettingsManager correctedSettings;
         check(correctedSettings.sourceLanguage() == QStringLiteral("auto"), "invalid source falls back to auto");
         check(correctedSettings.targetLanguage() == QStringLiteral("zh"), "invalid target falls back to zh");
-        check(correctedSettings.ocrEngine() == QStringLiteral("windows_ocr"),
-              "invalid OCR falls back to windows_ocr");
+        check(correctedSettings.ocrEngine() == QStringLiteral("tesseract"),
+              "invalid OCR falls back to tesseract");
         check(correctedSettings.translator() == QStringLiteral("none"),
               "invalid translator falls back to none");
 
@@ -401,7 +414,7 @@ int main(int argc, char *argv[])
               "corrected source is written back");
         check(storedSettings.value(QStringLiteral("language/target")).toString() == QStringLiteral("zh"),
               "corrected target is written back");
-        check(storedSettings.value(QStringLiteral("ocr/engine")).toString() == QStringLiteral("windows_ocr"),
+        check(storedSettings.value(QStringLiteral("ocr/engine")).toString() == QStringLiteral("tesseract"),
               "corrected OCR engine is written back");
         check(storedSettings.value(QStringLiteral("translator/engine")).toString() == QStringLiteral("none"),
               "corrected translator is written back");
