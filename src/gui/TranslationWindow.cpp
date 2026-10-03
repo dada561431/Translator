@@ -166,6 +166,7 @@ void TranslationWindow::resizeEvent(QResizeEvent *event)
 
 void TranslationWindow::closeEvent(QCloseEvent *event)
 {
+    emit stopRequested();
     if (settingsDialog_) {
         settingsDialog_->close();
     }
@@ -325,14 +326,8 @@ void TranslationWindow::connectControls()
 
     connect(regionButton_, &QPushButton::clicked,
             this, &TranslationWindow::regionSelectionRequested);
-    connect(startButton_, &QPushButton::clicked, this, [this] {
-        setTranslationRunning(true);
-        showToolbarStatus(tr("Started."));
-    });
-    connect(stopButton_, &QPushButton::clicked, this, [this] {
-        setTranslationRunning(false);
-        showToolbarStatus(tr("Stopped."));
-    });
+    connect(startButton_, &QPushButton::clicked, this, &TranslationWindow::startRequested);
+    connect(stopButton_, &QPushButton::clicked, this, &TranslationWindow::stopRequested);
     connect(settingsButton_, &QPushButton::clicked, this, [this] {
         settingsDialog_->show();
         settingsDialog_->raise();

@@ -49,6 +49,7 @@ void CaptureCoordinator::beginSelection()
     }
 
     selecting_ = true;
+    emit selectionStarted();
     window_.hide();
     QTimer::singleShot(80, this, [this] { selector_.start(); });
 }

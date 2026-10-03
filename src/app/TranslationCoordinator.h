@@ -16,7 +16,7 @@ public:
     using BackendFactory = std::function<std::unique_ptr<ITranslator>()>;
     TranslationCoordinator(SettingsManager &settings, BackendFactory factory, QObject *parent = nullptr);
     void acceptOcr(const OcrResult &result);
-    void invalidate();
+    void invalidate(bool resetDisplay = true);
 
 signals:
     void stateChanged(TranslationState state);

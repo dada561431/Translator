@@ -61,6 +61,27 @@ OcrCoordinator::~OcrCoordinator()
 void OcrCoordinator::recognize(const CaptureResult &capture,
                                const QString &sourceLanguage)
 {
+    if (busy_) {
+        pending_ = true;
+        pendingCapture_ = capture;
+        pendingLanguage_ = sourceLanguage;
+        return;
+    }
+    tryRecognize(capture, sourceLanguage);
+}
+
+void OcrCoordinator::discardPending()
+{
+    pending_ = false;
+    pendingCapture_ = {};
+    pendingLanguage_.clear();
+}
+
+quint64 OcrCoordinator::tryRecognize(const CaptureResult &capture,
+                                    const QString &sourceLanguage)
+{
+    if (busy_) return 0;
+    busy_ = true;
     const quint64 request = ++latestRequest_;
     const QImage image = capture.image;
     auto *worker = static_cast<OcrWorker *>(worker_);
@@ -69,18 +90,9 @@ void OcrCoordinator::recognize(const CaptureResult &capture,
         const OcrResult result = worker->recognize(image, sourceLanguage);
 #ifndef NDEBUG
         qDebug().noquote()
-            << QStringLiteral("[OCR]\n"
-                              "engine = %1\n"
-                              "sourceLanguage = %2\n"
-                              "tesseractLanguage = %3\n"
-                              "tessdata = %4\n"
-                              "input = %5x%6\n"
-                              "processed = %7x%8\n"
-                              "preprocess = %9 (%10 ms)\n"
-                              "psm = %11\n"
-                              "ocr = %12 ms\n"
-                              "elapsed = %13 ms\n"
-                              "text = \"%14\"\n"
+            << QStringLiteral("[OCR] engine=%1 source=%2 tessLanguage=%3 tessdata=%4 "
+                              "input=%5x%6 processed=%7x%8 preprocess=%9(%10ms) "
+                              "psm=%11 ocrMs=%12 elapsedMs=%13 text=\"%14\" "
                               "error = \"%15\"")
                    .arg(result.engineId, sourceLanguage,
                         result.tesseractLanguage, result.tessdataPath)
@@ -92,10 +104,20 @@ void OcrCoordinator::recognize(const CaptureResult &capture,
 #endif
         if (coordinator) {
             QMetaObject::invokeMethod(coordinator, [coordinator, request, result] {
-                if (coordinator && request == coordinator->latestRequest_) {
-                    emit coordinator->resultReady(result);
+                if (!coordinator) return;
+                coordinator->busy_ = false;
+                if (!coordinator->pending_) emit coordinator->resultReady(result);
+                if (!coordinator) return;
+                emit coordinator->taskFinished(request, result);
+                if (!coordinator) return;
+                if (coordinator->pending_ && !coordinator->busy_) {
+                    const auto capture = coordinator->pendingCapture_;
+                    const auto language = coordinator->pendingLanguage_;
+                    coordinator->discardPending();
+                    coordinator->tryRecognize(capture, language);
                 }
             }, Qt::QueuedConnection);
         }
     }, Qt::QueuedConnection);
+    return request;
 }

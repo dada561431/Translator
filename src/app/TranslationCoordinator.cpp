@@ -33,10 +33,10 @@ void TranslationCoordinator::connectBackend()
     }
 }
 
-void TranslationCoordinator::invalidate()
+void TranslationCoordinator::invalidate(bool resetDisplay)
 {
     activeRequestId_ = 0;
-    emit stateChanged(TranslationState::Idle);
+    if (resetDisplay) emit stateChanged(TranslationState::Idle);
 }
 
 void TranslationCoordinator::acceptOcr(const OcrResult &ocr)

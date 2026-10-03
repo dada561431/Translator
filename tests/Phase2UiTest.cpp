@@ -251,14 +251,27 @@ int main(int argc, char *argv[])
             check(status->isVisible(), "Region feedback is briefly shown in toolbar");
         }
         if (start && stop && status) {
+            int starts = 0, stops = 0;
+            const auto startConnection = QObject::connect(
+                &window, &TranslationWindow::startRequested, &window, [&] { ++starts; });
+            const auto stopConnection = QObject::connect(
+                &window, &TranslationWindow::stopRequested, &window, [&] { ++stops; });
             start->click();
+            check(starts == 1 && start->isEnabled(), "Start requests work without optimistic running state");
+            window.setTranslationRunning(true);
+            window.setRegionFeedback(QStringLiteral("Running"));
             check(!start->isEnabled() && stop->isEnabled(), "Start switches to running state");
             check(status->text()
-                      == QStringLiteral("Started."),
+                      == QStringLiteral("Running"),
                   "Start reports running UI state");
             stop->click();
+            check(stops == 1, "Stop requests coordinator cancellation");
+            window.setTranslationRunning(false);
+            window.setRegionFeedback(QStringLiteral("Stopped"));
             check(start->isEnabled() && !stop->isEnabled(), "Stop restores idle state");
-            check(status->text() == QStringLiteral("Stopped."), "Stop reports stopped state");
+            check(status->text() == QStringLiteral("Stopped"), "Stop reports stopped state");
+            QObject::disconnect(startConnection);
+            QObject::disconnect(stopConnection);
         }
 
         SettingsDialog *settingsDialog = requiredSettingsDialog(window);

@@ -17,6 +17,7 @@ public:
                        QObject *parent = nullptr);
 
 signals:
+    void selectionStarted();
     void captureCompleted(const CaptureResult &result);
 
 private:

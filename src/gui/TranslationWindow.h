@@ -27,9 +27,12 @@ public:
     void setOriginalText(const QString &text);
     void setRegionFeedback(const QString &message);
     void setTranslationState(TranslationState state);
+    void setTranslationRunning(bool running);
 
 signals:
     void regionSelectionRequested();
+    void startRequested();
+    void stopRequested();
 
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
@@ -41,7 +44,6 @@ protected:
 private:
     void createUi();
     void connectControls();
-    void setTranslationRunning(bool running);
     void showToolbarStatus(const QString &message);
     void scheduleToolbarHide();
     Qt::Edges resizeEdgesAt(const QPoint &position) const;

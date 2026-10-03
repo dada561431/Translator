@@ -6,6 +6,7 @@
 #include "app/CaptureCoordinator.h"
 #include "app/OcrCoordinator.h"
 #include "app/TranslationCoordinator.h"
+#include "app/RealtimePipelineCoordinator.h"
 #include "config/SettingsManager.h"
 #include "gui/TranslationWindow.h"
 #include "ocr/TesseractOcrEngine.h"
@@ -30,6 +31,21 @@ int main(int argc, char *argv[])
     TranslationCoordinator translationCoordinator(settings, [&] {
         return TranslatorFactory::create(settings, *credentials);
     });
+    RealtimePipelineCoordinator realtime(settings, ocrCoordinator, translationCoordinator);
+    QObject::connect(&translationWindow, &TranslationWindow::startRequested,
+                     &realtime, [&] { realtime.start(); });
+    QObject::connect(&translationWindow, &TranslationWindow::stopRequested,
+                     &realtime, &RealtimePipelineCoordinator::stop);
+    QObject::connect(&captureCoordinator, &CaptureCoordinator::selectionStarted,
+                     &realtime, &RealtimePipelineCoordinator::stop);
+    QObject::connect(&realtime, &RealtimePipelineCoordinator::runningChanged,
+                     &translationWindow, &TranslationWindow::setTranslationRunning);
+    QObject::connect(&realtime, &RealtimePipelineCoordinator::feedback,
+                     &translationWindow, &TranslationWindow::setRegionFeedback);
+    QObject::connect(&realtime, &RealtimePipelineCoordinator::originalTextReady,
+                     &translationWindow, &TranslationWindow::setOriginalText);
+    QObject::connect(&realtime, &RealtimePipelineCoordinator::subtitlesCleared,
+                     &translationWindow, [&] { translationWindow.setOriginalText(QString()); });
     QObject::connect(&translationCoordinator, &TranslationCoordinator::stateChanged,
                      &translationWindow, &TranslationWindow::setTranslationState);
     QObject::connect(&translationCoordinator, &TranslationCoordinator::resultReady,
@@ -41,28 +57,7 @@ int main(int argc, char *argv[])
 #endif
                      });
     QObject::connect(&captureCoordinator, &CaptureCoordinator::captureCompleted,
-                     &ocrCoordinator, [&ocrCoordinator, &settings, &translationCoordinator](const CaptureResult &capture) {
-                         translationCoordinator.invalidate();
-                         ocrCoordinator.recognize(capture, settings.sourceLanguage());
-                     });
-    QObject::connect(&ocrCoordinator, &OcrCoordinator::resultReady,
-                     &translationWindow, [&translationWindow, &settings, &translationCoordinator](const OcrResult &result) {
-                         if (!result.sourceLanguage.isEmpty()
-                             && result.sourceLanguage != settings.sourceLanguage()) return;
-#ifndef NDEBUG
-                         qDebug() << "[OCR] completed on GUI thread"
-                                  << QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs);
-#endif
-                         translationCoordinator.invalidate();
-                         if (!result.isValid()) {
-                             translationWindow.setOriginalText(QString());
-                             translationWindow.setRegionFeedback(
-                                 QStringLiteral("OCR failed: %1").arg(result.error));
-                             return;
-                         }
-                         translationWindow.setOriginalText(result.text);
-                         translationCoordinator.acceptOcr(result);
-                     });
+                     &realtime, &RealtimePipelineCoordinator::acceptOneShot);
     translationWindow.show();
 
     return application.exec();

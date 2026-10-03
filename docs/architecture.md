@@ -184,7 +184,7 @@ flowchart LR
 | `src/credentials/` | 安全存储平台边界 | ICredentialStore / WindowsCredentialStore；非 Windows unsupported |
 | `src/config/` | 配置模型、校验、迁移和持久化 | 已实现基础 `SettingsManager`/`QSettings` |
 
-各阶段只按实际需求加入接口和后端，不创建空类。Phase 5 已加入翻译；实时管线仍待 Phase 6。
+各阶段只按实际需求加入接口和后端，不创建空类。Phase 6 已加入实时管线；桌面/视频验收状态见阶段报告。
 
 ### 建议运行时关系
 
@@ -360,8 +360,67 @@ every compatible model behaves identically or is immune to prompt injection.
 
 TranslatorProviders is a static library shared by app and tests. Its only added
 platform link is advapi32 under WIN32. It contains no configuration singletons
-or credential exports. See translation-provider-phase51.md for verification and
-the complete completion report. No realtime triggering was added.
+or credential exports. See translation-provider-phase51.md for historical
+verification; Phase 6 adds scheduling above these unchanged provider boundaries.
+
+## Phase 6 Real-time Pipeline
+
+```mermaid
+flowchart TD
+    Region[RegionSelector / persisted single-screen logical QRect] --> Capture[CaptureCoordinator: one-shot]
+    Region --> Start[Start / saved-region validation]
+    Start --> Realtime[RealtimePipelineCoordinator / sessionId]
+    Realtime --> Timer[QTimer: immediate capture then 300ms]
+    Timer --> Screen[ScreenCaptureService / GUI thread]
+    Screen --> Compare[FrameComparator: grayscale thumbnail]
+    Compare -->|changed or empty/error confirmation| Pending[one running OCR + latest pending frame]
+    Capture -->|OneShot mode / new generation| Pending
+    Pending --> Worker[OcrCoordinator / IOcrEngine / QThread]
+    Worker --> Result[OcrResult + OCR request identity]
+    Result --> Valid[active session + source-language validation]
+    Valid --> Text[TextDeduplicator / empty debounce]
+    Text -->|changed nonempty text| Original[TranslationWindow: Original first]
+    Original --> Translation[TranslationCoordinator / existing requestId protection]
+    Translation --> Backend[configured ITranslator / None sends nothing]
+    Backend --> Reply[TranslationResult]
+    Reply --> Translation
+    Translation --> GUI[TranslationWindow: Translated]
+    Stop[Stop / Region selection / Close] -->|stop timer, retire generation, discard pending| Realtime
+    Stop -->|invalidate outstanding request without waiting| Translation
+```
+
+`main.cpp` only owns and wires services. TranslationWindow emits start/stop
+requests and receives authoritative running state; it has no timer or backend.
+CaptureCoordinator emits selectionStarted before hiding the window, so the
+pipeline stops before any selection overlay appears. Its existing one-shot
+capture path is retained and routed through the same generation validation.
+
+RealtimePipelineCoordinator owns session/frame identity, pending image,
+comparison reference, text dedup, empty confirmation and consecutive capture
+failure count. The physical worker is not canceled on Stop: its completion is
+ignored, and a restarted session can retain one latest frame until it finishes.
+`OcrCoordinator::tryRecognize` refuses work while busy; its compatibility
+`recognize` also retains at most one latest pending request instead of posting
+an unbounded queue. Only taskFinished carries the request identity used here;
+the legacy resultReady signal remains for old contract tests, not UI wiring.
+
+Settings changes rotate the generation and reset frame/text references, so even
+unchanged pixels are processed under new language/provider/model settings.
+TranslationCoordinator remains the sole stale-translation authority; its minimal
+`invalidate(false)` retires responses while preserving displayed content on Stop.
+
+FrameComparator compares at most 160x90 grayscale samples with tolerance, not
+full-resolution equality. TextDeduplicator normalizes horizontal whitespace and
+line endings without fuzzy matching. Two valid empty OCR results clear subtitles;
+a stable empty image is explicitly checked again despite frame dedup. OCR errors
+are retried and never counted as empties. Four consecutive capture failures stop
+monitoring; missing screens/invalid regions stop immediately. No new dependencies,
+providers, OCR models, settings parameters, DPI conversion or capture exclusion
+were introduced. QScreen remains the sole screen-coordinate authority. Avoid
+placing either application window inside the capture region.
+
+See `realtime-pipeline-phase6.md` for provisional thresholds, automated results,
+synthetic real-Tesseract performance and the blocked manual/video acceptance.
 
 ## Native Dependencies
 

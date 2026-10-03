@@ -170,7 +170,9 @@ void SettingsManager::setTargetLanguage(const QString &languageId)
 
 void SettingsManager::setOcrEngine(const QString &engineId)
 {
+    const QString before = ocrEngine();
     writeValidated(kOcrEngineKey, engineId, kOcrEngines, kDefaultOcrEngine);
+    if (before != ocrEngine()) emit translationSettingsChanged();
 }
 
 void SettingsManager::setTranslator(const QString &translatorId)

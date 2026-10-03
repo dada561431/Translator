@@ -12,6 +12,12 @@ set(CMAKE_AUTORCC ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network)
 
+set(REALTIME_SOURCES
+    src/app/RealtimePipelineCoordinator.h src/app/RealtimePipelineCoordinator.cpp
+    src/processing/FrameComparator.h src/processing/FrameComparator.cpp
+    src/processing/TextDeduplicator.h src/processing/TextDeduplicator.cpp
+)
+
 set(TRANSLATION_SOURCES
     src/app/TranslationCoordinator.h
     src/app/TranslationCoordinator.cpp
@@ -41,6 +47,7 @@ if(WIN32)
 endif()
 
 add_executable(Translator
+    ${REALTIME_SOURCES}
     ${TRANSLATION_SOURCES}
     src/main.cpp
     src/app/CaptureCoordinator.cpp
@@ -82,6 +89,30 @@ set_target_properties(Translator PROPERTIES
 include(CTest)
 
 if(BUILD_TESTING)
+    add_executable(TranslatorPhase6Tests
+        tests/Phase6RealtimeTest.cpp
+        ${REALTIME_SOURCES}
+        src/app/OcrCoordinator.h src/app/OcrCoordinator.cpp
+        src/capture/ScreenCaptureService.h src/capture/ScreenCaptureService.cpp
+        src/config/SettingsManager.h src/config/SettingsManager.cpp
+        ${TRANSLATION_SOURCES}
+    )
+    target_include_directories(TranslatorPhase6Tests PRIVATE src)
+    target_link_libraries(TranslatorPhase6Tests PRIVATE TranslatorProviders Qt6::Gui Qt6::Widgets)
+    add_executable(TranslatorRealtimeProbe
+        tests/RealtimeProbe.cpp
+        ${REALTIME_SOURCES}
+        src/app/OcrCoordinator.h src/app/OcrCoordinator.cpp
+        src/capture/ScreenCaptureService.h src/capture/ScreenCaptureService.cpp
+        src/config/SettingsManager.h src/config/SettingsManager.cpp
+        src/ocr/TesseractOcrEngine.h src/ocr/TesseractOcrEngine.cpp
+        src/ocr/OcrImagePreprocessor.h src/ocr/OcrImagePreprocessor.cpp
+        ${TRANSLATION_SOURCES}
+    )
+    target_include_directories(TranslatorRealtimeProbe PRIVATE src)
+    target_link_libraries(TranslatorRealtimeProbe PRIVATE TranslatorProviders Qt6::Gui Qt6::Widgets)
+    add_test(NAME phase6_realtime_pipeline COMMAND TranslatorPhase6Tests)
+    set_tests_properties(phase6_realtime_pipeline PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
     add_executable(TranslatorPhase51Tests
         tests/Phase51ProviderTest.cpp
         ${TRANSLATION_SOURCES}

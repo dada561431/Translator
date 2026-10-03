@@ -2,9 +2,36 @@
 
 `Translator` 是一个基于 Qt 6、C++17 和 Qt Widgets 的实时屏幕文字识别与翻译程序。本项目参考 LunaTranslator 的架构和功能设计，但采用独立的 Qt 6/C++ 实现；原 LunaTranslator 源码保持独立且不受本工程影响。
 
+## Phase 6 Real-time Pipeline
+
+Region → Start → periodic Capture / OCR / optional Translation → Stop.
+Region still performs a one-shot capture/OCR check and saves the region. Start
+reuses that region and captures immediately, then checks every 300 ms on the
+GUI thread. OCR runs on one background worker; only the newest pending frame
+is retained. Frame comparison reduces OCR work, and normalized-text deduplication
+reduces translation requests. None works without credentials. Two consecutive
+valid empty OCR results clear subtitles; OCR errors keep the previous text.
+
+Stop retires OCR and translation results without waiting for the worker/network.
+Selecting Region while running stops monitoring and stays stopped after selection
+or cancellation. Applied semantic settings retire old work and reprocess with
+the new settings on the next tick. Invalid/disconnected saved screens require a
+new Region; four consecutive capture failures stop monitoring.
+
+Keep the subtitle window and Settings dialog **outside the capture region**.
+QScreen desktop capture does not exclude this application's windows. Overlap
+can feed the displayed subtitles back into OCR. The application does not hide
+and show its window on each tick; capture exclusion is not implemented.
+
+Implementation and seven automated suites are available. Full Phase 6 manual
+acceptance is **pending**: desktop automation was blocked, so the required
+Bilibili five consecutive subtitles and desktop stability checks are not claimed.
+An offline synthetic-input probe uses real Tesseract; it is not video acceptance.
+See `docs/realtime-pipeline-phase6.md` for evidence and limitations.
+
 ## Phase 5.1 Provider / Model / Credential Settings
 
-One Region selection now triggers one local OCR operation and one optional
+One Region selection still triggers one local OCR operation and one optional
 asynchronous translation. `OcrCoordinator::resultReady` feeds
 `TranslationCoordinator`, then `ITranslator` and the configured backend through
 QtNetwork. Increasing IDs reject stale/duplicate responses. New input invalidates
@@ -91,8 +118,8 @@ Model, and credentials apply on Apply/OK. Applied changes invalidate pending
 requests and rebuild the backend. Old `translator/engine` migrates to
 `translator/provider` without resetting unrelated settings or storing secrets.
 See `docs/translation-provider-phase51.md` for current verification and
-`docs/translation-phase5.md` for the historical report. Phase 6 realtime capture
-is not implemented.
+`docs/translation-phase5.md` for the historical report. Phase 6 adds monitoring
+without redesigning providers, models, or credentials.
 
 ## Phase 4.1 OCR accuracy status
 
@@ -101,9 +128,9 @@ produces a `CaptureResult::image`; `OcrCoordinator` passes that image and the
 configured source-language ID to an `IOcrEngine` on a worker thread and emits an
 `OcrResult`. Valid recognized text, including an empty result, is passed to
 `TranslationWindow::setOriginalText()`; an empty result clears prior original
-text after the placeholder has been replaced. This is not continuous capture or
-continuous translation: Start/Stop remains a UI state control. Phase 5 translates
-valid OCR text only when DeepL is selected.
+text after the placeholder has been replaced. This historical Phase 4 one-shot
+path is retained; Phase 6 Start/Stop now controls the real scheduler. Changed
+nonempty OCR text is translated when an online provider is selected.
 
 The initial backend is Tesseract (`tesseract` engine ID). Language IDs are
 `auto`, `zh`, `en`, `ja`, and `ko`; `auto` is an English `eng` fallback, not
@@ -143,7 +170,7 @@ components.
 
 ## 当前阶段
 
-当前为 Phase 5.1：增加 Provider/Model 配置、Windows 安全凭据存储和 OpenAI-Compatible 后端；保持单次识别与翻译。
+当前为 Phase 6：已接入实时调度、帧差分、OCR 有界任务和文本去重；完整桌面/视频验收仍待完成。
 
 已实现：
 
@@ -156,7 +183,8 @@ components.
 - 高对比字幕文字与轻量阴影
 - 鼠标进入时显示、离开后隐藏的半透明工具栏
 - 启动时可见的双语 UI placeholder 与 hover 工具栏
-- Start/Stop 基础 UI 状态切换
+- Start/Stop 实时生命周期、会话 ID 和过期结果保护
+- 300ms 周期截图、帧差分、最新单帧 pending 和文本去重
 - 基于 `QSettings` 的配置持久化
 - 非法或过期配置的默认值回退
 - 悬浮窗口位置与尺寸恢复，以及屏幕外位置回退
@@ -175,7 +203,8 @@ components.
 
 ## 尚未实现
 
-- Continuous capture / Real-time pipeline
+- 完整 Bilibili 连续字幕与桌面长期稳定性验收
+- PaddleOCR / Phase 6.1
 - Overlay click-through
 - Hook
 - TTS
