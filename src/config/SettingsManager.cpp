@@ -34,7 +34,7 @@ const QStringList kTargetLanguages = {
 };
 
 const QStringList kOcrEngines = {QStringLiteral("tesseract")};
-const QStringList kTranslators = {QStringLiteral("none")};
+const QStringList kTranslators = {QStringLiteral("none"), QStringLiteral("deepl")};
 
 } // namespace
 
@@ -94,12 +94,16 @@ QString SettingsManager::captureScreen() const
 
 void SettingsManager::setSourceLanguage(const QString &languageId)
 {
+    const QString before = sourceLanguage();
     writeValidated(kSourceLanguageKey, languageId, kSourceLanguages, kDefaultSourceLanguage);
+    if (before != sourceLanguage()) emit translationSettingsChanged();
 }
 
 void SettingsManager::setTargetLanguage(const QString &languageId)
 {
+    const QString before = targetLanguage();
     writeValidated(kTargetLanguageKey, languageId, kTargetLanguages, kDefaultTargetLanguage);
+    if (before != targetLanguage()) emit translationSettingsChanged();
 }
 
 void SettingsManager::setOcrEngine(const QString &engineId)
@@ -109,7 +113,9 @@ void SettingsManager::setOcrEngine(const QString &engineId)
 
 void SettingsManager::setTranslator(const QString &translatorId)
 {
+    const QString before = translator();
     writeValidated(kTranslatorKey, translatorId, kTranslators, kDefaultTranslator);
+    if (before != translator()) emit translationSettingsChanged();
 }
 
 void SettingsManager::setWindowGeometry(const QByteArray &geometry)

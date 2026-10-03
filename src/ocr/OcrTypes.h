@@ -17,6 +17,7 @@ struct OcrResult
     int pageSegmentationMode = 0;
     qint64 preprocessingMs = 0;
     qint64 recognitionMs = 0;
+    QString sourceLanguage;
 
     bool isValid() const { return error.isEmpty(); }
 };

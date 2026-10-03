@@ -2,7 +2,7 @@
 
 ## 范围
 
-本文基于当前仓库源码的实际调用关系，记录 LunaTranslator 的核心架构，并给出 Translator 的 Qt 6/C++ 模块边界。Phase 1 建立了可配置、可编译、可启动的 Qt Widgets 骨架；Phase 2 增加基础翻译界面和设置持久化；Phase 3 加入单帧屏幕捕获；Phase 4 加入单帧 OCR；Phase 4.1 增加 OCR 预处理与字幕参数调优。翻译后端、Hook、TTS 和完整实时管线仍未实现。
+本文基于源码实际调用关系，记录 LunaTranslator 架构和 Translator 的 Qt 6/C++ 模块边界。Phase 1 建立工程；Phase 2/2.5 增加设置和透明字幕；Phase 3 加入单帧捕获；Phase 4/4.1 加入 OCR 与预处理；Phase 5 增加官方 DeepL 异步翻译。Hook、TTS 和完整实时管线仍未实现。
 
 ## 原项目架构
 
@@ -144,7 +144,7 @@ flowchart LR
     Manager --> Store[QSettings]
 ```
 
-当前稳定 ID 为语言代码 `auto`、`zh`、`en`、`ja`、`ko`，OCR engine 为 `tesseract`，Translator 为 `none`。`SettingsManager` 在读取时验证值；缺失、非法或已经移除的 ID 会回退到默认值并写回配置。
+当前稳定 ID 为语言代码 `auto`、`zh`、`en`、`ja`、`ko`，OCR engine 为 `tesseract`，Translator 为 `none`（默认）或 `deepl`。`SettingsManager` 在读取时验证值；缺失或非法 ID 回退并写回。Phase 5 仅增加 QObject 通知：语言/翻译引擎实际变化时发出 `translationSettingsChanged`，不保存 API Key。
 
 `TranslationWindow` 是 `QWidget` 顶层窗口，使用 `Qt::FramelessWindowHint`、`Qt::WindowStaysOnTopHint` 和 `Qt::WA_TranslucentBackground`。主体 `SubtitleArea` 不绘制背景，按“译文在上、原文在下”排列两个自动换行的 `QLabel`，并以高对比文字和轻量阴影保障可读性。半透明工具栏在鼠标进入窗口时显示，离开后延迟检查全窗口命中范围再隐藏，以避免经过子控件时闪烁。
 
@@ -174,20 +174,20 @@ flowchart LR
 
 | 目录 | 计划职责 | 当前状态 |
 | --- | --- | --- |
-| `src/app/` | 应用生命周期、依赖组装、管线协调 | 已实现小型 `CaptureCoordinator` |
+| `src/app/` | 应用生命周期、依赖组装、管线协调 | Capture/Ocr/TranslationCoordinator |
 | `src/gui/` | 悬浮翻译窗口、设置界面及后续 overlay 交互 | 已实现 `TranslationWindow` 与 `SettingsDialog` |
 | `src/capture/` | 区域选择、Qt 单帧截图及结果模型 | 已实现 `RegionSelector` 与 `ScreenCaptureService` |
 | `src/textsource/` | `ITextSource` 及 OCR/剪贴板/Hook 等来源 | 未实现 |
 | `src/ocr/` | `IOcrEngine`、结果模型与引擎选择 | 已实现接口与首个 Tesseract 后端 |
 | `src/processing/` | 源文本预处理、翻译前后处理和管线编排 | 未实现 |
-| `src/translator/` | `ITranslator`、调度、缓存与后端 | 未实现 |
+| `src/translator/` | 翻译值类型、异步接口、语言映射与后端 | ITranslator / DeepLTranslator；无缓存或实时调度 |
 | `src/config/` | 配置模型、校验、迁移和持久化 | 已实现基础 `SettingsManager`/`QSettings` |
 
-Phase 3 未为后续 OCR、翻译或实时管线边界创建空类；Phase 4 才加入 OCR 接口、后端与协调器。翻译和实时管线仍待后续阶段。
+各阶段只按实际需求加入接口和后端，不创建空类。Phase 5 已加入翻译；实时管线仍待 Phase 6。
 
 ### 建议运行时关系
 
-Phase 4 消费 `CaptureResult::image` 作为 OCR 输入，再将有效的识别文本（包括空文本）送到 `TranslationWindow::setOriginalText()`；空文本可清除之前显示的原文。后续翻译结果才会进入 `setTranslatedText()`；GUI 不直接调用具体 OCR 后端。
+`CaptureResult::image` 作为 OCR 输入，有效识别文本（包括空文本）送到 `TranslationWindow::setOriginalText()`。Phase 5 从同一 OCR 信号接入翻译；成功译文送到 `setTranslatedText()`。GUI 不调用 OCR 或 HTTP 后端。
 
 ## 原模块到新模块映射
 
@@ -259,6 +259,57 @@ fixed-font and real Bilibili video results are recorded in
 `docs/ocr-accuracy-phase41.md`. They support Tesseract for clean ordinary text
 but also show that scene-text/outlined/artistic subtitles require evaluation of
 an additional backend such as PaddleOCR in a later phase.
+
+## Phase 5 Translation implementation
+
+```mermaid
+flowchart TD
+    Region[RegionSelector] --> Capture[ScreenCaptureService]
+    Capture --> Frame[CaptureResult.image]
+    Frame --> OCR[OcrCoordinator / QThread]
+    OCR --> Interface[IOcrEngine]
+    Interface --> Prep[OcrImagePreprocessor]
+    Prep --> Engine[TesseractOcrEngine]
+    Engine --> Result[OcrResult / GUI-thread resultReady]
+    Result --> Original[TranslationWindow.setOriginalText]
+    Result --> Translation[TranslationCoordinator]
+    Translation --> Translator[ITranslator]
+    Translator --> DeepL[DeepLTranslator / QtNetwork]
+    DeepL --> Reply[TranslationResult]
+    Reply --> Translation
+    Translation --> UI[TranslationWindow state / translated text]
+```
+
+`main.cpp` owns and connects the three small coordinators. Capture completion
+invalidates pending translation before starting OCR. OCR completion updates the
+original immediately and calls `TranslationCoordinator::acceptOcr`; failures keep
+the existing OCR feedback path. `OcrResult::sourceLanguage` records the requested
+app-language ID so results from a previous source setting can be ignored.
+
+TranslationCoordinator owns one ITranslator, validates OCR/provider settings,
+assigns monotonically increasing IDs, and forwards only the current outstanding
+ID. Capture, blank/error OCR, and translation-related settings invalidate it.
+Completion also retires the ID, rejecting duplicates. Old HTTP requests may
+finish, but cannot change the UI; no cancellation scheduler is introduced.
+
+DeepLTranslator uses QNetworkAccessManager asynchronous POST and finished slots;
+there is no nested event loop or waiting in production. Local validation failures
+are queued. HTTP/transport/JSON/deadline errors become TranslationResult values.
+Its 15-second per-reply timer is a deadline, not a periodic capture timer.
+HTTPS official Free/Pro URLs, normal TLS validation, and manual redirect policy
+protect credentials. Only OCR text and mapped languages enter the JSON body.
+
+UI states are Idle (translation placeholder), Pending (`翻译中…`), Success (latest
+translated text), Error (`翻译失败`, original preserved). Both subtitles use
+PlainText QLabel format, avoiding provider/OCR markup interpretation. None sends
+no translation request. Settings store none/deepl only; credentials and endpoint
+come from process environment. Detailed mapping and verification are in
+`translation-phase5.md`.
+
+OCR and translation remain separate backend contracts. Adding PaddleOCR would
+implement IOcrEngine, not change DeepL; another translator would implement
+ITranslator, not change OCR. Future realtime triggering belongs above these
+services and must preserve latest-request semantics. It is not implemented here.
 
 ## Native Dependencies
 

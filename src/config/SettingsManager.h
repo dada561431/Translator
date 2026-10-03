@@ -2,12 +2,14 @@
 
 #include <QByteArray>
 #include <QSettings>
+#include <QObject>
 #include <QRect>
 #include <QString>
 #include <QStringList>
 
-class SettingsManager final
+class SettingsManager final : public QObject
 {
+    Q_OBJECT
 public:
     SettingsManager();
 
@@ -25,6 +27,9 @@ public:
     void setTranslator(const QString &translatorId);
     void setWindowGeometry(const QByteArray &geometry);
     void setCaptureRegion(const QRect &region, const QString &screenName);
+
+signals:
+    void translationSettingsChanged();
 
 private:
     QString readValidated(const QString &key,

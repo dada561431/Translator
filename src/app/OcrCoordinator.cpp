@@ -28,6 +28,7 @@ public:
             return result;
         }
         OcrResult result = engine_->recognize(image, sourceLanguage);
+        result.sourceLanguage = sourceLanguage;
         if (result.engineId.isEmpty()) {
             result.engineId = engine_->id();
         }

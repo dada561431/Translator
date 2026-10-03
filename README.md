@@ -2,6 +2,54 @@
 
 `Translator` 是一个基于 Qt 6、C++17 和 Qt Widgets 的实时屏幕文字识别与翻译程序。本项目参考 LunaTranslator 的架构和功能设计，但采用独立的 Qt 6/C++ 实现；原 LunaTranslator 源码保持独立且不受本工程影响。
 
+## Phase 5 Translation Backend
+
+One Region selection now triggers one local OCR operation and one optional
+asynchronous translation. `OcrCoordinator::resultReady` feeds
+`TranslationCoordinator`, then `ITranslator` and the official DeepL API through
+QtNetwork. Increasing IDs reject stale/duplicate responses. New input invalidates
+the old translation immediately. Pending shows `翻译中…`; Error shows `翻译失败`
+without losing the original text. Settings changes also invalidate pending work.
+
+Settings offer `None` (`none`, default) and `DeepL` (`deepl`). None never sends
+translation requests. DeepL sends OCR **text** to the service, never images or
+region pixels. OCR is local; online translation is not entirely local processing.
+
+### DeepL configuration
+
+Set `DEEPL_API_KEY` in the launching process environment. In Qt Creator use
+the run environment editor. Do not store credentials in tracked project files,
+QSettings, screenshots, shared logs, or commits. Environment changes require
+restarting Translator. A missing key fails locally with
+`DeepL API key is not configured.`. No key-entry UI is implemented; future
+user-level credential management should use a secure credential store.
+
+Optional `DEEPL_API_URL` defaults to `https://api-free.deepl.com/v2/translate`.
+Pro users set `https://api.deepl.com/v2/translate`. Only these official HTTPS
+endpoints are accepted; redirects are not followed. TLS verification is enabled.
+Requests have a 15-second deadline and no automatic retries.
+
+| App ID | Source code | Target code |
+| --- | --- | --- |
+| `auto` | omit `source_lang` | invalid |
+| `en` | `EN` | `EN-US` |
+| `zh` | `ZH` | `ZH-HANS` (simplified) |
+| `ja` | `JA` | `JA` |
+| `ko` | `KO` | `KO` |
+
+Translation `auto` uses DeepL detection; OCR `auto` still falls back to English.
+Equal source/target IDs return text locally. Blank/error OCR is never translated.
+Offline CTest uses fake/coordinator and HTTP fixtures, not real API calls.
+For manual EN → ZH and ZH → EN checks with a configured legitimate key:
+
+```powershell
+.\build\mingw\TranslatorDeepLProbe.exe
+```
+
+Without a key it reports SKIPPED. Real-provider and Region-to-translation manual
+acceptance remain pending in this environment because no key was configured.
+See `docs/translation-phase5.md`. Phase 6 realtime capture is not implemented.
+
 ## Phase 4.1 OCR accuracy status
 
 Phase 4 adds a single-frame OCR path after Region capture. A successful capture
@@ -10,8 +58,8 @@ configured source-language ID to an `IOcrEngine` on a worker thread and emits an
 `OcrResult`. Valid recognized text, including an empty result, is passed to
 `TranslationWindow::setOriginalText()`; an empty result clears prior original
 text after the placeholder has been replaced. This is not continuous capture or
-translation: Start/Stop remains a UI state control, and the translated subtitle
-still has no translation backend.
+continuous translation: Start/Stop remains a UI state control. Phase 5 translates
+valid OCR text only when DeepL is selected.
 
 The initial backend is Tesseract (`tesseract` engine ID). Language IDs are
 `auto`, `zh`, `en`, `ja`, and `ko`; `auto` is an English `eng` fallback, not
@@ -51,7 +99,7 @@ components.
 
 ## 当前阶段
 
-当前为 Phase 4.1：保留区域选择与单帧 OCR，并优化字幕 OCR 的预处理、PSM 和可观测性。
+当前为 Phase 5：保留 Phase 4.1 OCR，增加官方 DeepL 异步翻译与过期结果保护。
 
 已实现：
 
@@ -77,16 +125,17 @@ components.
 - 面向单行/多行字幕的 PSM 7/6 动态选择
 - 输入/处理尺寸、语言资源、预处理和耗时 Debug 诊断
 - OCR 有效结果更新原文字幕；空结果可清除先前原文
+- 独立翻译接口、协调器、语言映射与 DeepL 后端
+- None/DeepL 配置、QtNetwork 异步请求、错误状态与 stale response 保护
 
 ## 尚未实现
 
-- Translation backend
 - Continuous capture / Real-time pipeline
 - Overlay click-through
 - Hook
 - TTS
 
-Region 按钮会选择并截取一次屏幕区域，然后发起一次本地 OCR；不会发起翻译或网络请求。取消选择不会覆盖上次有效 Region。Debug 构建仅在本机系统临时目录覆盖保存一张 `Translator/last_capture.png` 供验证；Release 构建不写这张调试图。截图不会上传或写入仓库。
+Region 按钮会选择并截取一次屏幕区域，然后发起一次本地 OCR；选择 DeepL 时有效文字进入官方翻译 API，None 不发送翻译请求。取消选择不会覆盖上次有效 Region。Debug 构建仅在本机系统临时目录覆盖保存一张 `Translator/last_capture.png` 供验证；Release 构建不写这张调试图。截图不会上传或写入仓库。
 
 ## 当前 UI 架构
 
@@ -102,7 +151,7 @@ Region 按钮会选择并截取一次屏幕区域，然后发起一次本地 OCR
 
 ## 构建
 
-需要 CMake、Ninja、支持 C++17 的编译器，以及包含 Core、Gui、Widgets 组件的 Qt 6 开发环境。Qt 安装位置通过标准 CMake 机制发现；必要时由构建者在命令行设置 `CMAKE_PREFIX_PATH` 或 `Qt6_DIR`，也可使用环境变量 `CMAKE_PREFIX_PATH`。Windows 上构建和运行时还需让对应 MinGW 与 Qt 的 `bin` 目录可从 `PATH` 找到。工程本身不硬编码本机安装路径。
+需要 CMake、Ninja、支持 C++17 的编译器，以及包含 Core、Gui、Widgets、Network 组件的 Qt 6 开发环境。Qt 安装位置通过标准 CMake 机制发现；必要时由构建者在命令行设置 `CMAKE_PREFIX_PATH` 或 `Qt6_DIR`，也可使用环境变量 `CMAKE_PREFIX_PATH`。Windows 上构建和运行时还需让对应 MinGW 与 Qt 的 `bin` 目录可从 `PATH` 找到。工程本身不硬编码本机安装路径。
 
 ```powershell
 cmake -S . -B .\build\mingw -G Ninja -DCMAKE_PREFIX_PATH="<Qt6 install prefix>"

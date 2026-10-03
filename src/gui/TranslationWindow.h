@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QWidget>
+#include "translator/TranslationTypes.h"
 
 class QCloseEvent;
 class QEnterEvent;
@@ -23,6 +24,7 @@ public:
     void setTranslatedText(const QString &text);
     void setOriginalText(const QString &text);
     void setRegionFeedback(const QString &message);
+    void setTranslationState(TranslationState state);
 
 signals:
     void regionSelectionRequested();

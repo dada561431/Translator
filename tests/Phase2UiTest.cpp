@@ -254,8 +254,8 @@ int main(int argc, char *argv[])
             start->click();
             check(!start->isEnabled() && stop->isEnabled(), "Start switches to running state");
             check(status->text()
-                      == QStringLiteral("Translation UI started. Backend is not implemented yet."),
-                  "Start reports backend status");
+                      == QStringLiteral("Started."),
+                  "Start reports running UI state");
             stop->click();
             check(start->isEnabled() && !stop->isEnabled(), "Stop restores idle state");
             check(status->text() == QStringLiteral("Stopped."), "Stop reports stopped state");

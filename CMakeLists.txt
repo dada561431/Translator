@@ -10,9 +10,21 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network)
+
+set(TRANSLATION_SOURCES
+    src/app/TranslationCoordinator.h
+    src/app/TranslationCoordinator.cpp
+    src/translator/TranslationTypes.h
+    src/translator/ITranslator.h
+    src/translator/TranslationLanguageMapper.h
+    src/translator/TranslationLanguageMapper.cpp
+    src/translator/DeepLTranslator.h
+    src/translator/DeepLTranslator.cpp
+)
 
 add_executable(Translator
+    ${TRANSLATION_SOURCES}
     src/main.cpp
     src/app/CaptureCoordinator.cpp
     src/app/CaptureCoordinator.h
@@ -42,6 +54,7 @@ target_link_libraries(Translator PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    Qt6::Network
 )
 
 set_target_properties(Translator PROPERTIES
@@ -51,6 +64,32 @@ set_target_properties(Translator PROPERTIES
 include(CTest)
 
 if(BUILD_TESTING)
+    add_executable(TranslatorPhase5Tests
+        tests/Phase5TranslationTest.cpp
+        ${TRANSLATION_SOURCES}
+        src/config/SettingsManager.h
+        src/config/SettingsManager.cpp
+        src/gui/SettingsDialog.h
+        src/gui/SettingsDialog.cpp
+        src/gui/TranslationWindow.h
+        src/gui/TranslationWindow.cpp
+    )
+    target_include_directories(TranslatorPhase5Tests PRIVATE src)
+    target_link_libraries(TranslatorPhase5Tests PRIVATE Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Network)
+    add_test(NAME phase5_translation COMMAND TranslatorPhase5Tests)
+    set_tests_properties(phase5_translation PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+    add_executable(TranslatorDeepLProbe
+        tests/DeepLProbe.cpp
+        src/translator/TranslationTypes.h
+        src/translator/ITranslator.h
+        src/translator/TranslationLanguageMapper.h
+        src/translator/TranslationLanguageMapper.cpp
+        src/translator/DeepLTranslator.h
+        src/translator/DeepLTranslator.cpp
+    )
+    target_include_directories(TranslatorDeepLProbe PRIVATE src)
+    target_link_libraries(TranslatorDeepLProbe PRIVATE Qt6::Core Qt6::Network)
     add_executable(TranslatorPhase2Tests
         tests/Phase2UiTest.cpp
         src/config/SettingsManager.cpp

@@ -87,6 +87,20 @@ void TranslationWindow::setRegionFeedback(const QString &message)
     showToolbarStatus(message);
 }
 
+void TranslationWindow::setTranslationState(TranslationState state)
+{
+    if (state == TranslationState::Idle) {
+        translatedPlaceholder_ = true;
+        translatedLabel_->setText(tr("实时翻译将在这里显示"));
+    } else if (state == TranslationState::Pending) {
+        translatedPlaceholder_ = false;
+        translatedLabel_->setText(tr("翻译中…"));
+    } else if (state == TranslationState::Error) {
+        translatedPlaceholder_ = false;
+        translatedLabel_->setText(tr("翻译失败"));
+    }
+}
+
 bool TranslationWindow::eventFilter(QObject *watched, QEvent *event)
 {
     const auto *watchedWidget = qobject_cast<QWidget *>(watched);
@@ -219,6 +233,7 @@ void TranslationWindow::createUi()
 
     translatedLabel_ = new QLabel(subtitleArea_);
     translatedLabel_->setObjectName(QStringLiteral("translatedLabel"));
+    translatedLabel_->setTextFormat(Qt::PlainText);
     translatedLabel_->setAlignment(Qt::AlignHCenter | Qt::AlignVCenter);
     translatedLabel_->setWordWrap(true);
     translatedLabel_->setAttribute(Qt::WA_TransparentForMouseEvents);
@@ -231,6 +246,7 @@ void TranslationWindow::createUi()
 
     originalLabel_ = new QLabel(subtitleArea_);
     originalLabel_->setObjectName(QStringLiteral("originalLabel"));
+    originalLabel_->setTextFormat(Qt::PlainText);
     originalLabel_->setAlignment(Qt::AlignHCenter | Qt::AlignVCenter);
     originalLabel_->setWordWrap(true);
     originalLabel_->setAttribute(Qt::WA_TransparentForMouseEvents);
@@ -311,7 +327,7 @@ void TranslationWindow::connectControls()
             this, &TranslationWindow::regionSelectionRequested);
     connect(startButton_, &QPushButton::clicked, this, [this] {
         setTranslationRunning(true);
-        showToolbarStatus(tr("Translation UI started. Backend is not implemented yet."));
+        showToolbarStatus(tr("Started."));
     });
     connect(stopButton_, &QPushButton::clicked, this, [this] {
         setTranslationRunning(false);

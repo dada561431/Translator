@@ -57,7 +57,8 @@ void SettingsDialog::createUi()
 
     translatorCombo_ = new QComboBox(this);
     translatorCombo_->setObjectName(QStringLiteral("translatorCombo"));
-    translatorCombo_->addItem(tr("Not Configured"), QStringLiteral("none"));
+    translatorCombo_->addItem(tr("None"), QStringLiteral("none"));
+    translatorCombo_->addItem(tr("DeepL"), QStringLiteral("deepl"));
 
     const QList<QComboBox *> comboBoxes = {
         sourceLanguageCombo_,

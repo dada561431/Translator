@@ -32,3 +32,11 @@ rules.ninja
 # Operating system metadata
 Thumbs.db
 .DS_Store
+
+# Local credentials and debug captures
+.env
+.env.*
+key.txt
+secret.json
+*.traineddata
+last_capture.png
