@@ -17,6 +17,10 @@ public:
     QString targetLanguage();
     QString ocrEngine();
     QString translator();
+    QString deepLPlan() const;
+    QString deepLEndpoint() const;
+    QString openAiBaseUrl() const;
+    QString openAiModel() const;
     QByteArray windowGeometry() const;
     QRect captureRegion() const;
     QString captureScreen() const;
@@ -25,6 +29,10 @@ public:
     void setTargetLanguage(const QString &languageId);
     void setOcrEngine(const QString &engineId);
     void setTranslator(const QString &translatorId);
+    void setDeepLPlan(const QString &plan);
+    void setOpenAiBaseUrl(const QString &url);
+    void setOpenAiModel(const QString &model);
+    void notifyCredentialsChanged();
     void setWindowGeometry(const QByteArray &geometry);
     void setCaptureRegion(const QRect &region, const QString &screenName);
 
@@ -41,4 +49,5 @@ private:
                         const QString &defaultValue);
 
     QSettings settings_;
+    void writeTranslationValue(const QString &key, const QString &value);
 };

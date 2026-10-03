@@ -2,16 +2,31 @@
 #include <QTextStream>
 #include <QTimer>
 #include "translator/DeepLTranslator.h"
+#include "config/SettingsManager.h"
+#include "credentials/ICredentialStore.h"
 
 int main(int argc, char *argv[])
 {
     QCoreApplication application(argc, argv);
     QTextStream output(stdout);
-    if (qEnvironmentVariable("DEEPL_API_KEY").trimmed().isEmpty()) {
-        output << "SKIPPED - DEEPL_API_KEY not configured\n";
+    DeepLConfiguration configuration = DeepLConfiguration::fromEnvironment();
+    if (application.arguments().contains(QStringLiteral("--stored-credentials"))) {
+        application.setOrganizationName(QStringLiteral("TranslatorProject"));
+        application.setApplicationName(QStringLiteral("Translator"));
+        auto store = createPlatformCredentialStore();
+        QString error;
+        configuration.apiKey = store->loadSecret(QStringLiteral("deepl"), &error);
+        if (!error.isEmpty()) { output << "Secure credential read failed.\n"; return 1; }
+        SettingsManager settings;
+        configuration.endpoint = QUrl(settings.deepLEndpoint());
+    }
+    if (configuration.apiKey.trimmed().isEmpty()) {
+        output << (application.arguments().contains(QStringLiteral("--stored-credentials"))
+            ? "SKIPPED - no GUI DeepL credential configured\n"
+            : "SKIPPED - DEEPL_API_KEY not configured\n");
         return 0;
     }
-    DeepLTranslator translator;
+    DeepLTranslator translator(configuration);
     int failures = 0;
     QObject::connect(&translator, &ITranslator::resultReady, &application,
         [&](const TranslationResult &result) {

@@ -13,13 +13,15 @@ class QResizeEvent;
 class QTimer;
 class SettingsDialog;
 class SettingsManager;
+class ICredentialStore;
 
 class TranslationWindow final : public QWidget
 {
     Q_OBJECT
 
 public:
-    explicit TranslationWindow(SettingsManager &settings, QWidget *parent = nullptr);
+    explicit TranslationWindow(SettingsManager &settings, QWidget *parent = nullptr,
+                               ICredentialStore *credentials = nullptr);
 
     void setTranslatedText(const QString &text);
     void setOriginalText(const QString &text);

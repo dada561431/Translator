@@ -1,4 +1,5 @@
 #include "config/SettingsManager.h"
+#include "translator/TranslationProviderRegistry.h"
 
 #include <QGuiApplication>
 #include <QScreen>
@@ -8,7 +9,7 @@ namespace {
 const QString kSourceLanguageKey = QStringLiteral("language/source");
 const QString kTargetLanguageKey = QStringLiteral("language/target");
 const QString kOcrEngineKey = QStringLiteral("ocr/engine");
-const QString kTranslatorKey = QStringLiteral("translator/engine");
+const QString kTranslatorKey = QStringLiteral("translator/provider");
 const QString kWindowGeometryKey = QStringLiteral("window/geometry");
 const QString kCaptureRegionKey = QStringLiteral("capture/region");
 const QString kCaptureScreenKey = QStringLiteral("capture/screen");
@@ -34,12 +35,21 @@ const QStringList kTargetLanguages = {
 };
 
 const QStringList kOcrEngines = {QStringLiteral("tesseract")};
-const QStringList kTranslators = {QStringLiteral("none"), QStringLiteral("deepl")};
+const QStringList kTranslators = [] {
+    QStringList ids;
+    for (const auto &provider : TranslationProviderRegistry::providers()) ids.append(provider.id);
+    return ids;
+}();
 
 } // namespace
 
 SettingsManager::SettingsManager()
 {
+    const QString legacyKey = QStringLiteral("translator/engine");
+    if (!settings_.contains(kTranslatorKey) && settings_.contains(legacyKey))
+        settings_.setValue(kTranslatorKey, settings_.value(legacyKey));
+    settings_.remove(legacyKey);
+    settings_.sync();
     sourceLanguage();
     targetLanguage();
     ocrEngine();
@@ -65,6 +75,58 @@ QString SettingsManager::translator()
 {
     return readValidated(kTranslatorKey, kTranslators, kDefaultTranslator);
 }
+
+QString SettingsManager::deepLPlan() const
+{
+    const QString plan = settings_.value(QStringLiteral("translator/deepl/plan")).toString();
+    return plan == QLatin1String("pro") ? plan : QStringLiteral("free");
+}
+
+QString SettingsManager::deepLEndpoint() const
+{
+    if (settings_.contains(QStringLiteral("translator/deepl/plan")))
+        return deepLPlan() == QLatin1String("pro")
+            ? QStringLiteral("https://api.deepl.com/v2/translate")
+            : QStringLiteral("https://api-free.deepl.com/v2/translate");
+    const QString environment = qEnvironmentVariable("DEEPL_API_URL").trimmed();
+    return environment.isEmpty() ? QStringLiteral("https://api-free.deepl.com/v2/translate") : environment;
+}
+
+QString SettingsManager::openAiBaseUrl() const
+{
+    return settings_.value(QStringLiteral("translator/openaiCompatible/baseUrl")).toString();
+}
+
+QString SettingsManager::openAiModel() const
+{
+    return settings_.value(QStringLiteral("translator/openaiCompatible/model")).toString();
+}
+
+void SettingsManager::writeTranslationValue(const QString &key, const QString &value)
+{
+    if (settings_.contains(key) && settings_.value(key).toString() == value) return;
+    settings_.setValue(key, value);
+    settings_.sync();
+    emit translationSettingsChanged();
+}
+
+void SettingsManager::setDeepLPlan(const QString &plan)
+{
+    writeTranslationValue(QStringLiteral("translator/deepl/plan"),
+                          plan == QLatin1String("pro") ? plan : QStringLiteral("free"));
+}
+
+void SettingsManager::setOpenAiBaseUrl(const QString &url)
+{
+    writeTranslationValue(QStringLiteral("translator/openaiCompatible/baseUrl"), url.trimmed());
+}
+
+void SettingsManager::setOpenAiModel(const QString &model)
+{
+    writeTranslationValue(QStringLiteral("translator/openaiCompatible/model"), model.trimmed());
+}
+
+void SettingsManager::notifyCredentialsChanged() { emit translationSettingsChanged(); }
 
 QByteArray SettingsManager::windowGeometry() const
 {

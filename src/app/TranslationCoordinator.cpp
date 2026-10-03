@@ -1,6 +1,5 @@
 #include "app/TranslationCoordinator.h"
 #include "config/SettingsManager.h"
-#include "translator/TranslationLanguageMapper.h"
 
 #include <QDateTime>
 #include <QDebug>
@@ -10,12 +9,28 @@ TranslationCoordinator::TranslationCoordinator(SettingsManager &settings,
                                              QObject *parent)
     : QObject(parent), settings_(settings), translator_(std::move(translator))
 {
+    connectBackend();
+    connect(&settings_, &SettingsManager::translationSettingsChanged, this, [this] {
+        invalidate();
+        if (factory_) {
+            translator_ = factory_();
+            connectBackend();
+        }
+    });
+}
+
+TranslationCoordinator::TranslationCoordinator(SettingsManager &settings, BackendFactory factory, QObject *parent)
+    : TranslationCoordinator(settings, factory(), parent)
+{
+    factory_ = std::move(factory);
+}
+
+void TranslationCoordinator::connectBackend()
+{
     if (translator_) {
         connect(translator_.get(), &ITranslator::resultReady,
                 this, &TranslationCoordinator::receiveResult);
     }
-    connect(&settings_, &SettingsManager::translationSettingsChanged,
-            this, &TranslationCoordinator::invalidate);
 }
 
 void TranslationCoordinator::invalidate()
@@ -44,9 +59,7 @@ void TranslationCoordinator::acceptOcr(const OcrResult &ocr)
              << "OCR elapsed=" << ocr.elapsedMs;
 #endif
 
-    if (TranslationLanguageMapper::isSupportedSource(request.sourceLanguage)
-        && !TranslationLanguageMapper::targetCode(request.targetLanguage).isEmpty()
-        && request.sourceLanguage == request.targetLanguage) {
+    if (request.sourceLanguage == request.targetLanguage) {
         TranslationResult result;
         result.requestId = request.requestId;
         result.sourceText = request.sourceText;

@@ -224,7 +224,7 @@ void coordinatorChecks(QApplication &application)
     SettingsDialog dialog(settings);
     auto *combo = dialog.findChild<QComboBox *>(QStringLiteral("translatorCombo"));
     check(combo && combo->findData(QStringLiteral("deepl")) >= 0
-          && combo->findData(QStringLiteral("none")) >= 0, "settings expose only none/deepl real providers");
+          && combo->findData(QStringLiteral("none")) >= 0, "settings retain none/deepl providers");
     combo->setCurrentIndex(combo->findData(QStringLiteral("none")));
     SettingsManager reloaded;
     check(reloaded.translator() == QStringLiteral("none"), "provider setting persists");

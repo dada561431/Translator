@@ -15,13 +15,30 @@ find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network)
 set(TRANSLATION_SOURCES
     src/app/TranslationCoordinator.h
     src/app/TranslationCoordinator.cpp
+    src/translator/TranslatorFactory.h
+    src/translator/TranslatorFactory.cpp
+)
+
+add_library(TranslatorProviders STATIC
     src/translator/TranslationTypes.h
     src/translator/ITranslator.h
     src/translator/TranslationLanguageMapper.h
     src/translator/TranslationLanguageMapper.cpp
     src/translator/DeepLTranslator.h
     src/translator/DeepLTranslator.cpp
+    src/translator/OpenAiCompatibleTranslator.h
+    src/translator/OpenAiCompatibleTranslator.cpp
+    src/translator/TranslationProviderRegistry.h
+    src/translator/TranslationProviderRegistry.cpp
+    src/credentials/ICredentialStore.h
+    src/credentials/WindowsCredentialStore.h
+    src/credentials/WindowsCredentialStore.cpp
 )
+target_include_directories(TranslatorProviders PUBLIC src)
+target_link_libraries(TranslatorProviders PUBLIC Qt6::Core Qt6::Network)
+if(WIN32)
+    target_link_libraries(TranslatorProviders PRIVATE advapi32)
+endif()
 
 add_executable(Translator
     ${TRANSLATION_SOURCES}
@@ -51,6 +68,7 @@ add_executable(Translator
 target_include_directories(Translator PRIVATE src)
 
 target_link_libraries(Translator PRIVATE
+    TranslatorProviders
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
@@ -64,6 +82,19 @@ set_target_properties(Translator PROPERTIES
 include(CTest)
 
 if(BUILD_TESTING)
+    add_executable(TranslatorPhase51Tests
+        tests/Phase51ProviderTest.cpp
+        ${TRANSLATION_SOURCES}
+        src/config/SettingsManager.h src/config/SettingsManager.cpp
+        src/gui/SettingsDialog.h src/gui/SettingsDialog.cpp
+    )
+    target_include_directories(TranslatorPhase51Tests PRIVATE src)
+    target_link_libraries(TranslatorPhase51Tests PRIVATE TranslatorProviders Qt6::Gui Qt6::Widgets)
+    add_test(NAME phase51_provider_and_credentials COMMAND TranslatorPhase51Tests)
+    set_tests_properties(phase51_provider_and_credentials PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+    add_executable(TranslatorCredentialProbe tests/CredentialProbe.cpp)
+    target_link_libraries(TranslatorCredentialProbe PRIVATE TranslatorProviders)
     add_executable(TranslatorPhase5Tests
         tests/Phase5TranslationTest.cpp
         ${TRANSLATION_SOURCES}
@@ -75,21 +106,17 @@ if(BUILD_TESTING)
         src/gui/TranslationWindow.cpp
     )
     target_include_directories(TranslatorPhase5Tests PRIVATE src)
-    target_link_libraries(TranslatorPhase5Tests PRIVATE Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Network)
+    target_link_libraries(TranslatorPhase5Tests PRIVATE TranslatorProviders Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Network)
     add_test(NAME phase5_translation COMMAND TranslatorPhase5Tests)
     set_tests_properties(phase5_translation PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
     add_executable(TranslatorDeepLProbe
         tests/DeepLProbe.cpp
-        src/translator/TranslationTypes.h
-        src/translator/ITranslator.h
-        src/translator/TranslationLanguageMapper.h
-        src/translator/TranslationLanguageMapper.cpp
-        src/translator/DeepLTranslator.h
-        src/translator/DeepLTranslator.cpp
+        src/config/SettingsManager.h
+        src/config/SettingsManager.cpp
     )
     target_include_directories(TranslatorDeepLProbe PRIVATE src)
-    target_link_libraries(TranslatorDeepLProbe PRIVATE Qt6::Core Qt6::Network)
+    target_link_libraries(TranslatorDeepLProbe PRIVATE TranslatorProviders Qt6::Gui)
     add_executable(TranslatorPhase2Tests
         tests/Phase2UiTest.cpp
         src/config/SettingsManager.cpp
@@ -103,6 +130,7 @@ if(BUILD_TESTING)
     target_include_directories(TranslatorPhase2Tests PRIVATE src)
 
     target_link_libraries(TranslatorPhase2Tests PRIVATE
+        TranslatorProviders
         Qt6::Core
         Qt6::Gui
         Qt6::Widgets
@@ -123,7 +151,7 @@ if(BUILD_TESTING)
         src/config/SettingsManager.h
     )
     target_include_directories(TranslatorPhase3Tests PRIVATE src)
-    target_link_libraries(TranslatorPhase3Tests PRIVATE Qt6::Core Qt6::Gui Qt6::Widgets)
+    target_link_libraries(TranslatorPhase3Tests PRIVATE TranslatorProviders Qt6::Core Qt6::Gui Qt6::Widgets)
     add_test(NAME phase3_capture_logic COMMAND TranslatorPhase3Tests)
     set_tests_properties(phase3_capture_logic PROPERTIES
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
@@ -143,7 +171,7 @@ if(BUILD_TESTING)
         src/ocr/OcrTypes.h
     )
     target_include_directories(TranslatorPhase4Tests PRIVATE src)
-    target_link_libraries(TranslatorPhase4Tests PRIVATE Qt6::Core Qt6::Gui Qt6::Widgets)
+    target_link_libraries(TranslatorPhase4Tests PRIVATE TranslatorProviders Qt6::Core Qt6::Gui Qt6::Widgets)
     add_test(NAME phase4_ocr_logic COMMAND TranslatorPhase4Tests)
     set_tests_properties(phase4_ocr_logic PROPERTIES
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen"

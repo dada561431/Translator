@@ -38,7 +38,7 @@ QGraphicsDropShadowEffect *createSubtitleShadow(QObject *parent, int blurRadius)
 
 } // namespace
 
-TranslationWindow::TranslationWindow(SettingsManager &settings, QWidget *parent)
+TranslationWindow::TranslationWindow(SettingsManager &settings, QWidget *parent, ICredentialStore *credentials)
     : QWidget(parent,
               Qt::Window | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint)
     , settings_(settings)
@@ -55,7 +55,7 @@ TranslationWindow::TranslationWindow(SettingsManager &settings, QWidget *parent)
     translatedLabel_->setText(tr("实时翻译将在这里显示"));
     originalLabel_->setText(tr("Original text appears here"));
 
-    settingsDialog_ = new SettingsDialog(settings_, this);
+    settingsDialog_ = new SettingsDialog(settings_, this, credentials);
     restoreWindowGeometry();
 }
 

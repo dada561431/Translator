@@ -23,6 +23,7 @@ struct TranslationResult
     QString provider;
     int httpStatus = 0;
     qint64 elapsedMs = 0;
+    QString model;
 };
 
 enum class TranslationState { Idle, Pending, Success, Error };

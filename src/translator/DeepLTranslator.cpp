@@ -73,6 +73,8 @@ void DeepLTranslator::translate(const TranslationRequest &request)
     } else if (request.sourceLanguage == request.targetLanguage) {
         result.success = true;
         result.translatedText = request.sourceText;
+    } else if (!configuration_.error.isEmpty()) {
+        result.error = configuration_.error;
     } else if (configuration_.apiKey.trimmed().isEmpty()) {
         result.error = QStringLiteral("DeepL API key is not configured.");
     } else if (!isOfficialEndpoint(configuration_.endpoint)) {

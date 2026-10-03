@@ -9,6 +9,7 @@ struct DeepLConfiguration
     QString apiKey;
     QUrl endpoint = QUrl(QStringLiteral("https://api-free.deepl.com/v2/translate"));
     int timeoutMs = 15000;
+    QString error;
 
     static DeepLConfiguration fromEnvironment();
 };

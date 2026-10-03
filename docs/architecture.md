@@ -2,7 +2,7 @@
 
 ## 范围
 
-本文基于源码实际调用关系，记录 LunaTranslator 架构和 Translator 的 Qt 6/C++ 模块边界。Phase 1 建立工程；Phase 2/2.5 增加设置和透明字幕；Phase 3 加入单帧捕获；Phase 4/4.1 加入 OCR 与预处理；Phase 5 增加官方 DeepL 异步翻译。Hook、TTS 和完整实时管线仍未实现。
+本文基于源码实际调用关系，记录 LunaTranslator 架构和 Translator 的 Qt 6/C++ 模块边界。Phase 1 建立工程；Phase 2/2.5 增加设置和透明字幕；Phase 3 加入单帧捕获；Phase 4/4.1 加入 OCR 与预处理；Phase 5 增加 DeepL；Phase 5.1 增加 Provider/Model/安全凭据配置与 OpenAI-Compatible。Hook、TTS 和完整实时管线仍未实现。
 
 ## 原项目架构
 
@@ -144,7 +144,7 @@ flowchart LR
     Manager --> Store[QSettings]
 ```
 
-当前稳定 ID 为语言代码 `auto`、`zh`、`en`、`ja`、`ko`，OCR engine 为 `tesseract`，Translator 为 `none`（默认）或 `deepl`。`SettingsManager` 在读取时验证值；缺失或非法 ID 回退并写回。Phase 5 仅增加 QObject 通知：语言/翻译引擎实际变化时发出 `translationSettingsChanged`，不保存 API Key。
+当前语言 ID 为 `auto`、`zh`、`en`、`ja`、`ko`，OCR engine 为 `tesseract`，Provider 为 `none`（默认）、`deepl`、`openai_compatible`，取自 Registry。SettingsManager 验证并回退非法 ID；Phase 5.1 迁移 `translator/engine` 至 `translator/provider`，保留 `translator()/setTranslator()` API。配置或凭据变化发出 `translationSettingsChanged`；QSettings 不保存 API Key。
 
 `TranslationWindow` 是 `QWidget` 顶层窗口，使用 `Qt::FramelessWindowHint`、`Qt::WindowStaysOnTopHint` 和 `Qt::WA_TranslucentBackground`。主体 `SubtitleArea` 不绘制背景，按“译文在上、原文在下”排列两个自动换行的 `QLabel`，并以高对比文字和轻量阴影保障可读性。半透明工具栏在鼠标进入窗口时显示，离开后延迟检查全窗口命中范围再隐藏，以避免经过子控件时闪烁。
 
@@ -180,7 +180,8 @@ flowchart LR
 | `src/textsource/` | `ITextSource` 及 OCR/剪贴板/Hook 等来源 | 未实现 |
 | `src/ocr/` | `IOcrEngine`、结果模型与引擎选择 | 已实现接口与首个 Tesseract 后端 |
 | `src/processing/` | 源文本预处理、翻译前后处理和管线编排 | 未实现 |
-| `src/translator/` | 翻译值类型、异步接口、语言映射与后端 | ITranslator / DeepLTranslator；无缓存或实时调度 |
+| `src/translator/` | 翻译值类型、接口、映射、Registry/Factory 与后端 | DeepL / OpenAI Compatible；无实时调度 |
+| `src/credentials/` | 安全存储平台边界 | ICredentialStore / WindowsCredentialStore；非 Windows unsupported |
 | `src/config/` | 配置模型、校验、迁移和持久化 | 已实现基础 `SettingsManager`/`QSettings` |
 
 各阶段只按实际需求加入接口和后端，不创建空类。Phase 5 已加入翻译；实时管线仍待 Phase 6。
@@ -302,14 +303,65 @@ protect credentials. Only OCR text and mapped languages enter the JSON body.
 UI states are Idle (translation placeholder), Pending (`翻译中…`), Success (latest
 translated text), Error (`翻译失败`, original preserved). Both subtitles use
 PlainText QLabel format, avoiding provider/OCR markup interpretation. None sends
-no translation request. Settings store none/deepl only; credentials and endpoint
-come from process environment. Detailed mapping and verification are in
+no translation request. Phase 5 initially stored none/deepl only and used
+environment credentials; Phase 5.1 extends those boundaries below. Historical verification is in
 `translation-phase5.md`.
 
 OCR and translation remain separate backend contracts. Adding PaddleOCR would
 implement IOcrEngine, not change DeepL; another translator would implement
 ITranslator, not change OCR. Future realtime triggering belongs above these
 services and must preserve latest-request semantics. It is not implemented here.
+
+## Phase 5.1 Provider / Model / Credential architecture
+
+```mermaid
+flowchart TD
+    UI[SettingsDialog] --> Registry[TranslationProviderRegistry metadata]
+    UI --> Settings[SettingsManager: non-secret configuration]
+    UI --> Credentials[ICredentialStore]
+    Credentials --> Windows[WindowsCredentialStore: CredWriteW / CredReadW / CredDeleteW]
+    Settings -->|settingsChanged| Coordinator[TranslationCoordinator]
+    Coordinator --> Factory[TranslatorFactory]
+    Factory --> Credentials
+    Factory --> DeepL[DeepLTranslator]
+    Factory --> Compatible[OpenAiCompatibleTranslator]
+    DeepL --> Contract[ITranslator resultReady]
+    Compatible --> Contract
+    Contract --> Coordinator
+```
+
+Registry is a static capability table, not a plugin system. SettingsDialog uses
+metadata to show key/endpoint/model/plan rows. DeepL has no LLM model; OpenAI
+Compatible is a protocol profile with a user-selected model ID. Passwords are
+not loaded into editors. Replacement/removal drafts remain in memory until
+Apply/OK; Cancel clears them. Source/target/provider/plan retain immediate
+behavior; endpoint/model edits apply on Apply/OK. The privacy notice is explicit.
+
+Main owns one platform credential store shared with SettingsDialog and factory.
+Backend constructors receive configuration snapshots from factory, never know
+SettingsDialog or Win32 APIs. GUI credentials win over DeepL environment fallback.
+Read failures are surfaced, not bypassed. Windows generic credential targets are
+under Translator/Translation; other platforms fail rather than store plaintext.
+MemoryCredentialStore is test-only. A manual-only probe uses a unique self-test
+namespace to verify Windows APIs without replacing user slots.
+
+TranslationCoordinator accepts a backend factory callback. Effective configuration
+or credential changes invalidate the outstanding ID and recreate the backend;
+the counter never resets. Coordinator has no provider-specific HTTP, prompt,
+model, or credential code. Single-backend injection remains for Phase 5 tests.
+
+OpenAiCompatibleTranslator sends async non-streaming Chat Completions with one
+translation system message and one literal OCR user message. It has no default
+host/model or model discovery. Remote HTTPS and literal loopback HTTP are accepted;
+redirects and URL credentials/query/fragment are rejected. Normal TLS validation
+and per-reply deadline remain. Shared TranslationResult adds optional model.
+Refused/truncated/malformed responses fail. The profile and prompt do not guarantee
+every compatible model behaves identically or is immune to prompt injection.
+
+TranslatorProviders is a static library shared by app and tests. Its only added
+platform link is advapi32 under WIN32. It contains no configuration singletons
+or credential exports. See translation-provider-phase51.md for verification and
+the complete completion report. No realtime triggering was added.
 
 ## Native Dependencies
 

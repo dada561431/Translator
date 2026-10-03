@@ -9,7 +9,8 @@
 #include "config/SettingsManager.h"
 #include "gui/TranslationWindow.h"
 #include "ocr/TesseractOcrEngine.h"
-#include "translator/DeepLTranslator.h"
+#include "translator/TranslatorFactory.h"
+#include "credentials/ICredentialStore.h"
 
 #include <memory>
 
@@ -20,12 +21,15 @@ int main(int argc, char *argv[])
     QApplication::setApplicationName(QStringLiteral("Translator"));
 
     SettingsManager settings;
-    TranslationWindow translationWindow(settings);
+    auto credentials = createPlatformCredentialStore();
+    TranslationWindow translationWindow(settings, nullptr, credentials.get());
     CaptureCoordinator captureCoordinator(translationWindow, settings);
     OcrCoordinator ocrCoordinator([] {
         return std::make_unique<TesseractOcrEngine>();
     });
-    TranslationCoordinator translationCoordinator(settings, std::make_unique<DeepLTranslator>());
+    TranslationCoordinator translationCoordinator(settings, [&] {
+        return TranslatorFactory::create(settings, *credentials);
+    });
     QObject::connect(&translationCoordinator, &TranslationCoordinator::stateChanged,
                      &translationWindow, &TranslationWindow::setTranslationState);
     QObject::connect(&translationCoordinator, &TranslationCoordinator::resultReady,

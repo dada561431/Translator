@@ -416,8 +416,9 @@ int main(int argc, char *argv[])
               "corrected target is written back");
         check(storedSettings.value(QStringLiteral("ocr/engine")).toString() == QStringLiteral("tesseract"),
               "corrected OCR engine is written back");
-        check(storedSettings.value(QStringLiteral("translator/engine")).toString() == QStringLiteral("none"),
-              "corrected translator is written back");
+        check(storedSettings.value(QStringLiteral("translator/provider")).toString() == QStringLiteral("none")
+                  && !storedSettings.contains(QStringLiteral("translator/engine")),
+              "corrected translator is stored under migrated provider key");
     }
 
     {
