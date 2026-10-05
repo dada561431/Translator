@@ -8,6 +8,8 @@
 struct PaddleHelperOptions
 {
     QString python, script, models, cache;
+    QString executable, workingDirectory, validationError;
+    bool portablePython = false;
     int startupTimeoutMs = 30000;
     int requestTimeoutMs = 10000;
     int restartBackoffMs = 1000;

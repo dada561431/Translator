@@ -1,5 +1,6 @@
 """Resident local PP-OCRv6-small CPU worker. stdout is a framed binary protocol."""
 import argparse
+import hashlib
 import json
 import os
 import struct
@@ -64,6 +65,53 @@ def validate_image(header):
     return width, height, stride, size
 
 
+def native_model_directory(source, cache):
+    """Paddle's Windows narrow-path reader cannot open every Unicode model path."""
+    source = Path(source).resolve()
+    if os.name != "nt" or str(source).isascii():
+        return str(source)
+    import ctypes
+    import shutil
+    import tempfile
+    cache = Path(cache).resolve()
+    cache.mkdir(parents=True, exist_ok=True)
+    if not str(cache).isascii():
+        buffer = ctypes.create_unicode_buffer(32768)
+        get_short = ctypes.windll.kernel32.GetShortPathNameW
+        get_short.argtypes = (ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_uint32)
+        get_short.restype = ctypes.c_uint32
+        length = get_short(str(cache), buffer, len(buffer))
+        if not length or length >= len(buffer) or not buffer.value.isascii():
+            raise RuntimeError("Paddle requires an ASCII native model-cache path; this Unicode user cache has no ASCII short-path alias")
+        cache = Path(buffer.value)
+    files = ("inference.yml", "inference.json", "inference.pdiparams")
+    hashes = {}
+    for name in files:
+        with (source / name).open("rb") as stream:
+            hashes[name] = hashlib.file_digest(stream, "sha256").hexdigest()
+    identity = hashlib.sha256(json.dumps(hashes, sort_keys=True).encode("ascii")).hexdigest()
+    destination = cache / "verified-local-models" / identity
+    destination.mkdir(parents=True, exist_ok=True)
+    for name, expected in hashes.items():
+        target = destination / name
+        if target.is_file():
+            with target.open("rb") as stream:
+                if hashlib.file_digest(stream, "sha256").hexdigest() == expected:
+                    continue
+        with tempfile.NamedTemporaryFile(dir=destination, delete=False) as temp:
+            temporary = Path(temp.name)
+        try:
+            shutil.copyfile(source / name, temporary)
+            with temporary.open("rb") as stream:
+                if hashlib.file_digest(stream, "sha256").hexdigest() != expected:
+                    raise RuntimeError("Local model changed while staging")
+            os.replace(temporary, target)
+        finally:
+            temporary.unlink(missing_ok=True)
+    print(f"Verified bundled model copy; identity={identity[:16]}", file=sys.stderr, flush=True)
+    return str(destination)
+
+
 def reading_order(texts, boxes, scores):
     if not (len(texts) == len(boxes) == len(scores)):
         raise ValueError("OCR text/box/score counts differ")
@@ -90,6 +138,7 @@ def reading_order(texts, boxes, scores):
 
 class SmallOcr:
     def __init__(self, models, cpu_threads):
+        self.model_names = ["PP-OCRv6_small_det", "PP-OCRv6_small_rec"]
         directories = {}
         # Validate all local assets before importing the inference stack; never download.
         for kind in ("det", "rec"):
@@ -99,7 +148,8 @@ class SmallOcr:
                 raise FileNotFoundError(f"Local model missing or ambiguous: {name}")
             if not (configs[0].parent / "inference.pdiparams").is_file():
                 raise FileNotFoundError(f"Local weights missing: {name}")
-            directories[kind] = str(configs[0].parent)
+            directories[kind] = native_model_directory(configs[0].parent,
+                os.environ.get("PADDLE_PDX_CACHE_HOME", str(Path.home() / ".cache/translator-ocr")))
         print("MKL-DNN disabled; PP-OCRv6-small CPU; loading local models", file=sys.stderr, flush=True)
         from paddleocr import PaddleOCR
         self.ocr = PaddleOCR(device="cpu", engine="paddle_static",
@@ -123,7 +173,8 @@ class SmallOcr:
 
 
 def serve(input_stream, output_stream, engine):
-    write_frame(output_stream, dict(type="ready", engine="paddle-small", mkldnn=False))
+    write_frame(output_stream, dict(type="ready", engine="paddle-small", mkldnn=False,
+                                   models=getattr(engine, "model_names", [])))
     while True:
         header = read_header(input_stream)
         if header is None or header.get("type") == "shutdown":

@@ -30,10 +30,18 @@ using DeleteTextFn = void (*)(const char *);
 using ClearFn = void (*)(TessBaseAPI *);
 using SetPageSegModeFn = void (*)(TessBaseAPI *, int);
 
+bool portableInstallation()
+{
+    const QDir app(QCoreApplication::applicationDirPath());
+    return app.exists(QStringLiteral("runtime-manifest.json")) || app.exists(QStringLiteral("ocr"));
+}
+
 QStringList engineDirectories()
 {
     QStringList directories;
     const QString appDir = QCoreApplication::applicationDirPath();
+    if (portableInstallation())
+        return {QDir(appDir).filePath(QStringLiteral("ocr/tesseract"))};
     if (!appDir.isEmpty())
         directories << appDir;
 
@@ -55,6 +63,9 @@ QStringList engineDirectories()
 
 QString findLibrary()
 {
+    const QDir app(QCoreApplication::applicationDirPath());
+    if (portableInstallation())
+        return app.filePath(QStringLiteral("ocr/tesseract/libtesseract-5.dll"));
 #ifdef Q_OS_WIN
     const QStringList names = {QStringLiteral("libtesseract-5.dll"),
                                QStringLiteral("libtesseract.dll")};
@@ -74,6 +85,8 @@ QString findLibrary()
 
 QString findDataDirectory(const QString &libraryPath)
 {
+    if (portableInstallation())
+        return QDir(QFileInfo(libraryPath).absolutePath()).filePath(QStringLiteral("tessdata"));
     QStringList candidates;
     const auto environment = QProcessEnvironment::systemEnvironment();
     const QString prefix = environment.value(QStringLiteral("TESSDATA_PREFIX"));
@@ -150,6 +163,10 @@ struct TesseractOcrEngine::Impl
         if (api)
             return true;
         libraryPath = findLibrary();
+        if (portableInstallation() && !QFileInfo(libraryPath).isFile()) {
+            loadError = QStringLiteral("Tesseract is unavailable in this portable package. Select PP-OCRv6 Small; Tesseract runtime is not bundled.");
+            return false;
+        }
         library.setFileName(libraryPath);
 #ifdef Q_OS_WIN
         // Preload with the DLL's own directory so its bundled dependencies resolve.

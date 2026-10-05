@@ -27,6 +27,7 @@ set(TRANSLATION_SOURCES
 
 set(PADDLE_OCR_SOURCES
     src/ocr/PaddleOcrEngine.h src/ocr/PaddleOcrEngine.cpp
+    src/ocr/PaddleRuntimeLocator.h src/ocr/PaddleRuntimeLocator.cpp
 )
 
 add_library(TranslatorProviders STATIC
@@ -56,6 +57,7 @@ add_executable(Translator
     ${REALTIME_SOURCES}
     ${TRANSLATION_SOURCES}
     src/main.cpp
+    src/app/RuntimeSelfCheck.cpp src/app/RuntimeSelfCheck.h
     src/app/CaptureCoordinator.cpp
     src/app/CaptureCoordinator.h
     src/app/OcrCoordinator.cpp
@@ -95,6 +97,10 @@ set_target_properties(Translator PROPERTIES
 include(CTest)
 
 if(BUILD_TESTING)
+    add_executable(TranslatorRuntimeLocatorTests tests/RuntimeLocatorTest.cpp ${PADDLE_OCR_SOURCES})
+    target_include_directories(TranslatorRuntimeLocatorTests PRIVATE src)
+    target_link_libraries(TranslatorRuntimeLocatorTests PRIVATE Qt6::Core Qt6::Gui)
+    add_test(NAME phase61c_runtime_locator COMMAND TranslatorRuntimeLocatorTests)
     add_executable(TranslatorPaddleProbe
         tests/PaddleIntegrationProbe.cpp ${PADDLE_OCR_SOURCES} ${REALTIME_SOURCES} ${TRANSLATION_SOURCES}
         src/app/CaptureCoordinator.cpp src/app/CaptureCoordinator.h
@@ -121,6 +127,9 @@ if(BUILD_TESTING)
     endif()
     find_package(Python3 QUIET COMPONENTS Interpreter)
     if(Python3_Interpreter_FOUND)
+        add_test(NAME phase61c_package_validator COMMAND ${Python3_EXECUTABLE}
+            -m unittest discover -s scripts -p test_*.py)
+        set_tests_properties(phase61c_package_validator PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
         add_test(NAME phase61b1_false_positive_analysis COMMAND ${Python3_EXECUTABLE}
             -m unittest discover -s tools/ocr_false_positive_analysis -p test_*.py)
         set_tests_properties(phase61b1_false_positive_analysis PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")

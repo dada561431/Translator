@@ -2,6 +2,31 @@
 
 `Translator` 是一个基于 Qt 6、C++17 和 Qt Widgets 的实时屏幕文字识别与翻译程序。本项目参考 LunaTranslator 的架构和功能设计，但采用独立的 Qt 6/C++ 实现；原 LunaTranslator 源码保持独立且不受本工程影响。
 
+## Phase 6.1C Portable Build Infrastructure
+
+**Portable acceptance is pending, not fully verified.** A local Windows x64
+draft is generated at `dist/TranslatorPortable/`. The selected layout contains
+app-local Python, fixed Paddle packages and the verified small models, with Qt
+DLLs/plugins deployed by `windeployqt`. Development overrides remain supported.
+
+Release/Debug builds and 13/13 CTest suites pass. Local minimal-PATH OCR,
+Unicode/space model paths (with verified user-cache staging), read-only install
+directory, real desktop capture and Stop/Start helper reuse were tested. However,
+the current draft lacks app-local `msvcp140.dll` and `vcomp140.dll`; native audit
+correctly returns failure. Clean-machine/disconnected-network acceptance and
+full redistribution-license review are outstanding. Do not distribute this
+draft as a verified self-contained release. No zip or installer is produced.
+
+The portable draft explicitly does **not** bundle Tesseract; selecting it reports
+unavailable instead of borrowing the development machine's installation.
+Outside portable mode the existing Tesseract fallback remains unchanged.
+
+See [build command and acceptance report](docs/windows-portable-runtime-phase61c.md)
+and [runtime license inventory](docs/third-party-runtime-licenses.md).
+The one-command builder is `scripts/package_windows.py`; validation is
+`scripts/validate_windows_package.py`. Inputs are explicit parameters, not
+developer installation paths embedded in CMake or production code.
+
 ## Phase 6.1B Production OCR Helper
 
 Settings -> OCR Engine -> **PP-OCRv6 Small** -> select Region -> Start.
@@ -21,7 +46,8 @@ Missing assets produce an OCR error; the app does not install or download them.
 Pinned runtime packages are in `helpers/ocr/requirements.txt`.
 
 **MKL-DNN is explicitly disabled.** No medium model, GPU default, embedded
-Python, MinGW/MSVC Paddle linkage, packaging or installer is introduced.
+Python or MinGW/MSVC Paddle linkage was introduced in Phase 6.1B. Phase 6.1C
+adds portable-build infrastructure; an installer remains out of scope.
 OCR pixels stay local; the selected online translation provider receives OCR
 text through the existing credential-protected translation implementation.
 `auto` uses the small recognition model directly, unlike Tesseract's English

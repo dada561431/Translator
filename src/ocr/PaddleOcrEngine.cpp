@@ -1,4 +1,5 @@
 #include "ocr/PaddleOcrEngine.h"
+#include "ocr/PaddleRuntimeLocator.h"
 #include <QCoreApplication>
 #include <QDebug>
 #include <QDir>
@@ -8,39 +9,20 @@
 #include <QProcessEnvironment>
 #include <QThread>
 #include <QtEndian>
+#ifdef Q_OS_WIN
+#include <windows.h>
+#endif
 
 namespace {
 constexpr quint32 maxReply = 4 * 1024 * 1024;
 constexpr qint64 maxPixels = 64 * 1024 * 1024;
-QString checkoutRoot(QString start)
-{
-    QDir dir(start);
-    do {
-        if (QFileInfo::exists(dir.filePath(QStringLiteral("helpers/ocr/paddle_helper.py"))))
-            return dir.absolutePath();
-    } while (dir.cdUp());
-    return {};
-}
 bool interrupted() { return QThread::currentThread()->isInterruptionRequested(); }
 }
 
 PaddleHelperOptions PaddleHelperOptions::fromEnvironment()
 {
-    QString root = checkoutRoot(QCoreApplication::applicationDirPath());
-    if (root.isEmpty()) root = checkoutRoot(QDir::currentPath());
-    PaddleHelperOptions options;
-    options.python = qEnvironmentVariable("TRANSLATOR_OCR_PYTHON");
-    options.script = qEnvironmentVariable("TRANSLATOR_OCR_HELPER");
-    options.models = qEnvironmentVariable("TRANSLATOR_OCR_MODELS");
-    options.cache = QDir(root.isEmpty() ? QCoreApplication::applicationDirPath() : root)
-                        .filePath(QStringLiteral(".cache/ocr-helper"));
-    if (!root.isEmpty()) {
-        if (options.python.isEmpty()) options.python = QDir(root).filePath(
-            QStringLiteral("benchmarks/ocr_phase61a/.venv/Scripts/python.exe"));
-        if (options.script.isEmpty()) options.script = QDir(root).filePath(QStringLiteral("helpers/ocr/paddle_helper.py"));
-        if (options.models.isEmpty()) options.models = QDir(root).filePath(QStringLiteral("benchmarks/ocr_phase61a/models"));
-    }
-    return options;
+    return PaddleRuntimeLocator::locate(QCoreApplication::applicationDirPath(), QDir::currentPath(),
+                                       QProcessEnvironment::systemEnvironment());
 }
 
 PaddleOcrEngine::PaddleOcrEngine(PaddleHelperOptions options) : options_(std::move(options))
@@ -143,7 +125,10 @@ bool PaddleOcrEngine::ensureReady(QString &error)
         return false;
     }
     stop();
-    if (!QFileInfo(options_.python).isFile() || !QFileInfo(options_.script).isFile()) {
+    if (!options_.validationError.isEmpty()) {
+        error = options_.validationError; fail(error); return false;
+    }
+    if (options_.executable.isEmpty() && (!QFileInfo(options_.python).isFile() || !QFileInfo(options_.script).isFile())) {
         error = QStringLiteral("Paddle helper runtime missing. Configure TRANSLATOR_OCR_PYTHON / TRANSLATOR_OCR_HELPER, or select Tesseract.");
         fail(error); return false;
     }
@@ -153,29 +138,16 @@ bool PaddleOcrEngine::ensureReady(QString &error)
     }
     process_ = std::make_unique<QProcess>();
     process_->setProcessChannelMode(QProcess::SeparateChannels);
-    // Do not pass provider credentials or unrelated environment secrets to Python.
-    const auto system = QProcessEnvironment::systemEnvironment();
-    QProcessEnvironment env;
-    for (const auto &key : system.keys()) {
-        const auto upper = key.toUpper();
-        if (QStringList{QStringLiteral("PATH"), QStringLiteral("SYSTEMROOT"), QStringLiteral("WINDIR"),
-            QStringLiteral("TEMP"), QStringLiteral("TMP"), QStringLiteral("USERPROFILE"),
-            QStringLiteral("LOCALAPPDATA"), QStringLiteral("APPDATA"), QStringLiteral("NUMBER_OF_PROCESSORS")}.contains(upper))
-            env.insert(key, system.value(key));
-    }
-    env.insert(QStringLiteral("PYTHONNOUSERSITE"), QStringLiteral("1"));
-    env.insert(QStringLiteral("PYTHONIOENCODING"), QStringLiteral("utf-8"));
-    env.insert(QStringLiteral("HF_HUB_OFFLINE"), QStringLiteral("1"));
-    env.insert(QStringLiteral("HF_HUB_DISABLE_TELEMETRY"), QStringLiteral("1"));
-    env.insert(QStringLiteral("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK"), QStringLiteral("True"));
-    env.insert(QStringLiteral("PADDLE_PDX_CACHE_HOME"), options_.cache);
-    env.insert(QStringLiteral("HF_HOME"), QDir(options_.cache).filePath(QStringLiteral("hf")));
-    env.insert(QStringLiteral("MODELSCOPE_CACHE"), QDir(options_.cache).filePath(QStringLiteral("modelscope")));
-    env.insert(QStringLiteral("PADDLE_HOME"), QDir(options_.cache).filePath(QStringLiteral("paddle")));
-    process_->setProcessEnvironment(env);
+    process_->setProcessEnvironment(PaddleRuntimeLocator::environment(options_, QProcessEnvironment::systemEnvironment()));
+    if (!options_.workingDirectory.isEmpty()) process_->setWorkingDirectory(options_.workingDirectory);
+#ifdef Q_OS_WIN
+    process_->setCreateProcessArgumentsModifier([](QProcess::CreateProcessArguments *args) {
+        args->flags |= CREATE_NO_WINDOW;
+    });
+#endif
     diagnostic_.clear();
-    process_->start(options_.python, {QStringLiteral("-u"), options_.script,
-        QStringLiteral("--models"), options_.models, QStringLiteral("--cpu-threads"), QStringLiteral("4")});
+    process_->start(options_.executable.isEmpty() ? options_.python : options_.executable,
+                    PaddleRuntimeLocator::arguments(options_));
     QElapsedTimer timer; timer.start();
     while (process_->state() == QProcess::Starting && timer.elapsed() < options_.startupTimeoutMs && !interrupted())
         process_->waitForStarted(50);

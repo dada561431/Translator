@@ -51,5 +51,7 @@ benchmarks/ocr_phase61a/smoke/
 __pycache__/
 *.pyc
 .cache/
+dist/
+*.zip
 benchmarks/ocr_false_positive/private/
 benchmarks/ocr_false_positive/results/

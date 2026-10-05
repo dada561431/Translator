@@ -1,8 +1,46 @@
 # Translator 架构分析与阶段设计
 
+## Phase 6.1C Deployment
+
+The Windows x64 portable draft has the following deployment boundary:
+
+```text
+TranslatorPortable/
+  Translator.exe, Qt6*.dll, MinGW runtime, qt.conf
+  platforms/qwindows.dll, imageformats/, styles/, tls/
+  ocr/helper/paddle_helper.py
+  ocr/runtime/python.exe, Python DLLs, Lib/site-packages/
+  ocr/models/PP-OCRv6_small_det/, PP-OCRv6_small_rec/
+  licenses/, runtime-manifest.json, README.txt
+```
+
+`PaddleRuntimeLocator` resolves explicit development overrides, then app-relative
+assets, then checkout fallback only outside portable mode. A manifest or `ocr/`
+directory marks a portable installation; missing packaged assets cannot silently
+fall back to the checkout. A launch specification supplies program, arguments,
+working directory and whitelisted environment to the existing worker-owned
+QProcess. Script and executable helper modes retain protocol v1 and MKL-DNN false.
+The selected distribution uses isolated app-local Python, not a copied venv.
+
+On Windows, Paddle's native model JSON reader failed for Unicode model paths.
+The helper stages only the three required files of each supplied model into a
+content-addressed user cache, checking source and copied SHA256 values. It never
+chooses an unrelated cached model or downloads one. ASCII model paths bypass
+staging. A Unicode user-cache path needs an available ASCII Windows short alias;
+otherwise an explicit error is returned. Bundled assets remain immutable.
+Python bytecode/cache writes are disabled for portable launch. QSettings remains
+UserScope and provider keys remain in Windows Credential Manager, not the package.
+
+Tesseract is not bundled in this draft because its native dependency/license
+review is incomplete. Portable lookup is restricted to app-local assets and reports
+unavailable; development lookup remains unchanged. No silent engine change occurs.
+Packaging and static dependency validation currently report two missing VC DLLs;
+clean-machine and full license acceptance are pending. See
+`windows-portable-runtime-phase61c.md` and `third-party-runtime-licenses.md`.
+
 ## 范围
 
-本文基于源码实际调用关系，记录 LunaTranslator 架构和 Translator 的 Qt 6/C++ 模块边界。Phase 1 建立工程；Phase 2/2.5 增加设置和透明字幕；Phase 3 加入单帧捕获；Phase 4/4.1 加入 OCR 与预处理；Phase 5 增加 DeepL；Phase 5.1 增加 Provider/Model/安全凭据配置与 OpenAI-Compatible。Hook、TTS 和完整实时管线仍未实现。
+本文基于源码实际调用关系，记录 LunaTranslator 架构和 Translator 的 Qt 6/C++ 模块边界。Phase 1 建立工程；Phase 2/2.5 增加设置和透明字幕；Phase 3 加入单帧捕获；Phase 4/4.1 加入 OCR 与预处理；Phase 5 增加 DeepL；Phase 5.1 增加 Provider/Model/安全凭据配置与 OpenAI-Compatible；Phase 6 增加实时管线；Phase 6.1B 接入常驻 Paddle helper；Phase 6.1C 增加 portable 构建与校验基础设施，发布验收尚未完成。Hook、TTS 仍未实现。
 
 ## 原项目架构
 

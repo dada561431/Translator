@@ -62,6 +62,8 @@ int main(int argc, char **argv)
     heartbeat.start();
     int failures = 0, index = 0, repeats = 0;
     bool finished = false;
+    bool restarted = false;
+    qint64 beforeRestartPid = 0, restartLatencyMs = 0;
     auto finish = [&](QJsonObject extra = {}) {
         if (finished) return;
         finished = true;
@@ -165,6 +167,7 @@ int main(int argc, char **argv)
     QObject::connect(&pipeline, &RealtimePipelineCoordinator::sampleAccepted, &app,
         [&](quint64, quint64, const OcrResult &result, qint64 latency) {
             record(result, latency);
+            if (restarted) restartLatencyMs = result.elapsedMs;
             // Keep this frame stable long enough for its translation to return.
             QTimer::singleShot(5000, &app, [&, text = result.text] {
                 if (++index < images.size()) source.setPixmap(QPixmap(images[index]));
@@ -174,6 +177,15 @@ int main(int argc, char **argv)
                     const auto captures = pipeline.statistics().captures;
                     QTimer::singleShot(1000, &app, [&, captures, text] {
                         if (captures != pipeline.statistics().captures) ++failures;
+                        if (args.contains(QStringLiteral("--restart")) && !restarted) {
+                            restarted = true;
+                            beforeRestartPid = samples.last().toObject().value("helper_pid").toVariant().toLongLong();
+                            window.findChild<QPushButton *>("startButton")->click();
+                            return;
+                        }
+                        const bool samePid = !restarted || (beforeRestartPid > 0 && beforeRestartPid
+                            == samples.last().toObject().value("helper_pid").toVariant().toLongLong());
+                        if (!samePid) ++failures;
                         auto *original = window.findChild<QLabel *>("originalLabel");
                         auto *translated = window.findChild<QLabel *>("translatedLabel");
                         const bool originalVisible = original && original->text() == text;
@@ -186,6 +198,8 @@ int main(int argc, char **argv)
                         finish({{"captures", qint64(pipeline.statistics().captures)},
                             {"unchanged", qint64(pipeline.statistics().unchangedFrames)},
                             {"original_visible", originalVisible}, {"translation_visible", translationVisible},
+                            {"restart_tested", restarted}, {"restart_same_pid", samePid},
+                            {"restart_first_ocr_ms", restartLatencyMs},
                             {"stop_halts_capture", captures == pipeline.statistics().captures}});
                     });
                 }
