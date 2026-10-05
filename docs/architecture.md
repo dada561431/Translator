@@ -440,7 +440,23 @@ Paddle C++ into Qt. ONNX C-API parity is a potential later route, not verified
 integration. No IOcrEngine, Settings, OCR coordinator or realtime algorithm was
 changed. See `ocr-scene-text-evaluation-phase61a.md` for evidence and scope limits.
 
-## Native Dependencies
+## Phase 6.1B: Production Persistent OCR Helper
+
+The production OCR factory now selects Tesseract or `PaddleOcrEngine` according
+to the GUI-thread engine snapshot attached to each frame. The worker owns the
+engine and QProcess, replacing it on engine-ID changes. Pending and completed
+frames are still bounded and validated by session, language and selected engine.
+The persistent `helpers/ocr/paddle_helper.py` loads local PP-OCRv6 small det/rec
+once, explicitly disables MKL-DNN, and returns framed UTF-8 JSON over stdout
+for length-prefixed raw RGB888 input. Diagnostics use stderr; image stride and
+request identity are validated. No Python or MSVC Paddle library is linked into
+the MinGW Qt application. Stop keeps the helper warm; Close interrupts and reaps
+it. Missing resources/failures are explicit with bounded restart backoff; manual
+Tesseract fallback remains selectable. Existing translation/credential services
+are unchanged. See `ocr-helper-phase61b.md` for runtime discovery, protocol,
+verified real-screen/DeepL results and remaining manual/video acceptance limits.
+
+## Reference Native Dependencies
 
 以下依赖来自源码和 native CMake，Phase 1 均未迁移或链接。
 

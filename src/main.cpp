@@ -9,7 +9,7 @@
 #include "app/RealtimePipelineCoordinator.h"
 #include "config/SettingsManager.h"
 #include "gui/TranslationWindow.h"
-#include "ocr/TesseractOcrEngine.h"
+#include "ocr/OcrEngineFactory.h"
 #include "translator/TranslatorFactory.h"
 #include "credentials/ICredentialStore.h"
 
@@ -25,8 +25,9 @@ int main(int argc, char *argv[])
     auto credentials = createPlatformCredentialStore();
     TranslationWindow translationWindow(settings, nullptr, credentials.get());
     CaptureCoordinator captureCoordinator(translationWindow, settings);
-    OcrCoordinator ocrCoordinator([] {
-        return std::make_unique<TesseractOcrEngine>();
+    const auto helperOptions = PaddleHelperOptions::fromEnvironment();
+    OcrCoordinator ocrCoordinator({}, nullptr, [helperOptions](const QString &engineId) {
+        return OcrEngineFactory::create(engineId, helperOptions);
     });
     TranslationCoordinator translationCoordinator(settings, [&] {
         return TranslatorFactory::create(settings, *credentials);

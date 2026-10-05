@@ -251,6 +251,17 @@ int main(int argc, char **argv) {
         f.finish(); check(f.original == QStringLiteral("World"), "realtime succeeds after one-shot retirement");
     }
     {
+        Fixture f; f.region(); f.pipeline.start();
+        check(until([&] { return f.state->calls == 1; }), "engine-switch old request is in flight");
+        const auto session = f.pipeline.sessionId();
+        f.settings.setOcrEngine(QStringLiteral("paddle-small"));
+        check(f.pipeline.sessionId() != session, "OCR engine change retires the session");
+        f.pipeline.tick(); f.finish();
+        check(f.originalUpdates == 0 && f.backend->requests.isEmpty(), "old engine cannot publish or translate");
+        f.finish();
+        check(f.originalUpdates == 1, "new engine snapshot reprocesses the same frame");
+    }
+    {
         auto state = std::make_shared<EngineState>();
         OcrCoordinator ocr([state] { return std::make_unique<Engine>(state); });
         CaptureResult capture; capture.image = QImage(160, 50, QImage::Format_RGB32);

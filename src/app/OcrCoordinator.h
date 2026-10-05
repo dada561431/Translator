@@ -15,12 +15,16 @@ class OcrCoordinator final : public QObject
 
 public:
     using EngineFactory = std::function<std::unique_ptr<IOcrEngine>()>;
+    using SelectedEngineFactory = std::function<std::unique_ptr<IOcrEngine>(const QString &)>;
 
-    explicit OcrCoordinator(EngineFactory engineFactory, QObject *parent = nullptr);
+    explicit OcrCoordinator(EngineFactory engineFactory, QObject *parent = nullptr,
+                            SelectedEngineFactory selectedFactory = {});
     ~OcrCoordinator() override;
 
-    void recognize(const CaptureResult &capture, const QString &sourceLanguage);
-    quint64 tryRecognize(const CaptureResult &capture, const QString &sourceLanguage);
+    void recognize(const CaptureResult &capture, const QString &sourceLanguage,
+                   const QString &engineId = QStringLiteral("tesseract"));
+    quint64 tryRecognize(const CaptureResult &capture, const QString &sourceLanguage,
+                         const QString &engineId = QStringLiteral("tesseract"));
     bool isBusy() const { return busy_; }
     void discardPending();
 
@@ -36,4 +40,5 @@ private:
     bool pending_ = false;
     CaptureResult pendingCapture_;
     QString pendingLanguage_;
+    QString pendingEngine_;
 };

@@ -34,7 +34,7 @@ const QStringList kTargetLanguages = {
     QStringLiteral("ko"),
 };
 
-const QStringList kOcrEngines = {QStringLiteral("tesseract")};
+const QStringList kOcrEngines = {QStringLiteral("tesseract"), QStringLiteral("paddle-small")};
 const QStringList kTranslators = [] {
     QStringList ids;
     for (const auto &provider : TranslationProviderRegistry::providers()) ids.append(provider.id);

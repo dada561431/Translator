@@ -142,7 +142,7 @@ void RealtimePipelineCoordinator::acceptOneShot(const CaptureResult &capture)
 void RealtimePipelineCoordinator::enqueue(const CaptureResult &capture)
 {
     if (pending_) ++statistics_.pendingReplaced;
-    pending_ = Frame{capture, settings_.sourceLanguage(), session_, ++sequence_, clock_.elapsed()};
+    pending_ = Frame{capture, settings_.sourceLanguage(), settings_.ocrEngine(), session_, ++sequence_, clock_.elapsed()};
     dispatchPending();
 }
 
@@ -151,7 +151,7 @@ void RealtimePipelineCoordinator::dispatchPending()
     if (!pending_ || ocr_.isBusy() || mode_ == Mode::Stopped) return;
     active_ = std::move(*pending_);
     pending_.reset();
-    activeRequest_ = ocr_.tryRecognize(active_.capture, active_.language);
+    activeRequest_ = ocr_.tryRecognize(active_.capture, active_.language, active_.engine);
     if (activeRequest_) ++statistics_.ocrStarted;
 }
 
@@ -162,7 +162,8 @@ void RealtimePipelineCoordinator::completed(quint64 request, const OcrResult &re
     const Frame completedFrame = std::move(active_);
     active_ = {};
     if (completedFrame.session != session_ || mode_ == Mode::Stopped
-        || completedFrame.language != settings_.sourceLanguage()) {
+        || completedFrame.language != settings_.sourceLanguage()
+        || completedFrame.engine != settings_.ocrEngine()) {
         ++statistics_.staleOcr;
 #ifndef NDEBUG
         qDebug() << "[Realtime] ignored stale OCR session=" << completedFrame.session
@@ -174,7 +175,7 @@ void RealtimePipelineCoordinator::completed(quint64 request, const OcrResult &re
     if (!result.isValid()) {
         consecutiveEmpty_ = 0;
         retryOcr_ = true;
-        emit feedback(QStringLiteral("OCR failed; previous subtitles kept."));
+        emit feedback(QStringLiteral("OCR failed: %1; previous subtitles kept.").arg(result.error.left(240)));
     } else {
         retryOcr_ = false;
         OcrResult normalized = result;

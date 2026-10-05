@@ -58,6 +58,7 @@ private:
     struct Frame {
         CaptureResult capture;
         QString language;
+        QString engine;
         quint64 session = 0, sequence = 0;
         qint64 detectedMs = 0;
     };

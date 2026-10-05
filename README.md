@@ -2,7 +2,45 @@
 
 `Translator` 是一个基于 Qt 6、C++17 和 Qt Widgets 的实时屏幕文字识别与翻译程序。本项目参考 LunaTranslator 的架构和功能设计，但采用独立的 Qt 6/C++ 实现；原 LunaTranslator 源码保持独立且不受本工程影响。
 
-## Phase 6.1A OCR Evaluation
+## Phase 6.1B Production OCR Helper
+
+Settings -> OCR Engine -> **PP-OCRv6 Small** -> select Region -> Start.
+The existing pipeline now supports a persistent local Python/Paddle helper via
+`PaddleOcrEngine`, as well as the unchanged selectable Tesseract backend. Stop
+keeps the helper warm; Close interrupts and terminates it. Switching engines
+replaces the worker-owned engine and retires old results. Failures are explicit;
+Tesseract fallback is a manual selection, not a silent backend change.
+
+This checkout reuses the already verified local runtime at
+`benchmarks/ocr_phase61a/.venv/Scripts/python.exe` and small weights below
+`benchmarks/ocr_phase61a/models/`. The application discovers its checkout from
+the executable location or working directory, including Qt Creator build trees.
+Optional `TRANSLATOR_OCR_PYTHON`, `TRANSLATOR_OCR_HELPER`, and
+`TRANSLATOR_OCR_MODELS` override these paths in the launching environment.
+Missing assets produce an OCR error; the app does not install or download them.
+Pinned runtime packages are in `helpers/ocr/requirements.txt`.
+
+**MKL-DNN is explicitly disabled.** No medium model, GPU default, embedded
+Python, MinGW/MSVC Paddle linkage, packaging or installer is introduced.
+OCR pixels stay local; the selected online translation provider receives OCR
+text through the existing credential-protected translation implementation.
+`auto` uses the small recognition model directly, unlike Tesseract's English
+fallback. Chinese subtitle quality is verified; English/Japanese quality is not
+established by this ten-frame set. Korean requires Tesseract in this integration.
+
+Release/Debug builds and all 11 CTest suites pass. The native IPC path retains
+9/10 exact matches with one helper PID across 20 requests. A separate real desktop
+capture probe displayed three user-provided paused-video subtitle crops, recognized
+them locally and received three successful HTTP 200 DeepL translations, visibly
+updating the subtitle widgets. This is not continuous-video or Qt Creator manual
+acceptance. See `docs/ocr-helper-phase61b.md` for evidence and remaining limits.
+
+**Known Limitation:** subtitle-free complex backgrounds can occasionally yield
+false short characters that update Original and trigger translation. This is
+not fixed. Phase 6.1B.1 production filtering is deferred; optional metadata and
+local analysis tooling remain, with no new confidence/geometry/temporal filter.
+
+### Historical Phase 6.1A Evaluation
 
 Independent local benchmark tooling is available in `tools/ocr_benchmark/` and
 `benchmarks/ocr_phase61a/`. Ten distinct user-confirmed Bilibili subtitle crops
@@ -10,7 +48,7 @@ were compared using the unchanged production Tesseract pipeline and official
 PP-OCRv6 small/medium CPU pipelines. Exact matches: 1/10, 9/10 and 8/10;
 micro CER: 70.27%, 2.70%, 2.70%. Successful Paddle runs explicitly disable
 MKL-DNN after a Windows runtime incompatibility. Small is the recommended
-future candidate, not an installed production backend. All private images,
+production candidate at that evaluation stage; Phase 6.1B integrates small. All private images,
 labels, models, runtimes and raw reports remain local and ignored.
 See `docs/ocr-scene-text-evaluation-phase61a.md` for latency, failure cases,
 limited scene coverage and researched Windows/MinGW deployment routes.
@@ -89,7 +127,7 @@ Requests have a 15-second deadline and no automatic retries.
 | `ja` | `JA` | `JA` |
 | `ko` | `KO` | `KO` |
 
-Translation `auto` uses DeepL detection; OCR `auto` still falls back to English.
+Translation `auto` uses DeepL detection; Tesseract OCR `auto` falls back to English.
 Equal source/target IDs return text locally. Blank/error OCR is never translated.
 Offline CTest uses fake/coordinator and HTTP fixtures, not real API calls.
 For manual EN → ZH and ZH → EN checks with a configured legitimate key:
@@ -184,7 +222,7 @@ components.
 
 ## 当前阶段
 
-当前为 Phase 6：已接入实时调度、帧差分、OCR 有界任务和文本去重；完整桌面/视频验收仍待完成。
+当前为 Phase 6.1B：已接入常驻 PP-OCRv6 Small helper，保留 Tesseract；完整连续视频与长期稳定性验收仍待完成。
 
 已实现：
 
@@ -218,7 +256,7 @@ components.
 ## 尚未实现
 
 - 完整 Bilibili 连续字幕与桌面长期稳定性验收
-- Production PaddleOCR backend / Phase 6.1B (Phase 6.1A evaluation is separate)
+- Standalone OCR runtime packaging / installer (Phase 6.1C)
 - Overlay click-through
 - Hook
 - TTS

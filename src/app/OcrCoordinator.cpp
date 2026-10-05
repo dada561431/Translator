@@ -9,16 +9,21 @@ namespace {
 class OcrWorker final : public QObject
 {
 public:
-    explicit OcrWorker(OcrCoordinator::EngineFactory factory)
-        : factory_(std::move(factory))
+    explicit OcrWorker(OcrCoordinator::EngineFactory factory,
+                       OcrCoordinator::SelectedEngineFactory selectedFactory)
+        : factory_(std::move(factory)), selectedFactory_(std::move(selectedFactory))
     {
     }
 
-    OcrResult recognize(const QImage &image, const QString &sourceLanguage)
+    OcrResult recognize(const QImage &image, const QString &sourceLanguage, const QString &engineId)
     {
-        if (!initialized_) {
+        if (!initialized_ || selectedId_ != engineId) {
             initialized_ = true;
-            if (factory_) {
+            selectedId_ = engineId;
+            engine_.reset();
+            if (selectedFactory_) {
+                engine_ = selectedFactory_(engineId);
+            } else if (factory_) {
                 engine_ = factory_();
             }
         }
@@ -37,15 +42,18 @@ public:
 
 private:
     OcrCoordinator::EngineFactory factory_;
+    OcrCoordinator::SelectedEngineFactory selectedFactory_;
+    QString selectedId_;
     std::unique_ptr<IOcrEngine> engine_;
     bool initialized_ = false;
 };
 
 } // namespace
 
-OcrCoordinator::OcrCoordinator(EngineFactory engineFactory, QObject *parent)
+OcrCoordinator::OcrCoordinator(EngineFactory engineFactory, QObject *parent,
+                               SelectedEngineFactory selectedFactory)
     : QObject(parent)
-    , worker_(new OcrWorker(std::move(engineFactory)))
+    , worker_(new OcrWorker(std::move(engineFactory), std::move(selectedFactory)))
 {
     worker_->moveToThread(&workerThread_);
     connect(&workerThread_, &QThread::finished, worker_, &QObject::deleteLater);
@@ -54,20 +62,22 @@ OcrCoordinator::OcrCoordinator(EngineFactory engineFactory, QObject *parent)
 
 OcrCoordinator::~OcrCoordinator()
 {
+    workerThread_.requestInterruption();
     workerThread_.quit();
     workerThread_.wait();
 }
 
 void OcrCoordinator::recognize(const CaptureResult &capture,
-                               const QString &sourceLanguage)
+                               const QString &sourceLanguage, const QString &engineId)
 {
     if (busy_) {
         pending_ = true;
         pendingCapture_ = capture;
         pendingLanguage_ = sourceLanguage;
+        pendingEngine_ = engineId;
         return;
     }
-    tryRecognize(capture, sourceLanguage);
+    tryRecognize(capture, sourceLanguage, engineId);
 }
 
 void OcrCoordinator::discardPending()
@@ -75,10 +85,11 @@ void OcrCoordinator::discardPending()
     pending_ = false;
     pendingCapture_ = {};
     pendingLanguage_.clear();
+    pendingEngine_.clear();
 }
 
 quint64 OcrCoordinator::tryRecognize(const CaptureResult &capture,
-                                    const QString &sourceLanguage)
+                                    const QString &sourceLanguage, const QString &engineId)
 {
     if (busy_) return 0;
     busy_ = true;
@@ -86,13 +97,14 @@ quint64 OcrCoordinator::tryRecognize(const CaptureResult &capture,
     const QImage image = capture.image;
     auto *worker = static_cast<OcrWorker *>(worker_);
     QPointer<OcrCoordinator> coordinator(this);
-    QMetaObject::invokeMethod(worker, [coordinator, worker, request, image, sourceLanguage] {
-        const OcrResult result = worker->recognize(image, sourceLanguage);
+    QMetaObject::invokeMethod(worker, [coordinator, worker, request, image, sourceLanguage, engineId] {
+        const OcrResult result = worker->recognize(image, sourceLanguage, engineId);
+        if (!result.isValid()) qWarning().noquote() << "[OCR]" << result.error.left(500);
 #ifndef NDEBUG
         qDebug().noquote()
             << QStringLiteral("[OCR] engine=%1 source=%2 tessLanguage=%3 tessdata=%4 "
                               "input=%5x%6 processed=%7x%8 preprocess=%9(%10ms) "
-                              "psm=%11 ocrMs=%12 elapsedMs=%13 text=\"%14\" "
+                              "psm=%11 ocrMs=%12 elapsedMs=%13 chars=%14 "
                               "error = \"%15\"")
                    .arg(result.engineId, sourceLanguage,
                         result.tesseractLanguage, result.tessdataPath)
@@ -100,7 +112,7 @@ quint64 OcrCoordinator::tryRecognize(const CaptureResult &capture,
                    .arg(result.processedSize.width()).arg(result.processedSize.height())
                    .arg(result.preprocessingMode).arg(result.preprocessingMs)
                    .arg(result.pageSegmentationMode).arg(result.recognitionMs)
-                   .arg(result.elapsedMs).arg(result.text, result.error);
+                   .arg(result.elapsedMs).arg(result.text.size()).arg(result.error);
 #endif
         if (coordinator) {
             QMetaObject::invokeMethod(coordinator, [coordinator, request, result] {
@@ -113,8 +125,9 @@ quint64 OcrCoordinator::tryRecognize(const CaptureResult &capture,
                 if (coordinator->pending_ && !coordinator->busy_) {
                     const auto capture = coordinator->pendingCapture_;
                     const auto language = coordinator->pendingLanguage_;
+                    const auto engineId = coordinator->pendingEngine_;
                     coordinator->discardPending();
-                    coordinator->tryRecognize(capture, language);
+                    coordinator->tryRecognize(capture, language, engineId);
                 }
             }, Qt::QueuedConnection);
         }

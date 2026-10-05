@@ -25,6 +25,10 @@ set(TRANSLATION_SOURCES
     src/translator/TranslatorFactory.cpp
 )
 
+set(PADDLE_OCR_SOURCES
+    src/ocr/PaddleOcrEngine.h src/ocr/PaddleOcrEngine.cpp
+)
+
 add_library(TranslatorProviders STATIC
     src/translator/TranslationTypes.h
     src/translator/ITranslator.h
@@ -47,6 +51,8 @@ if(WIN32)
 endif()
 
 add_executable(Translator
+    ${PADDLE_OCR_SOURCES}
+    src/ocr/OcrEngineFactory.h src/ocr/OcrEngineFactory.cpp
     ${REALTIME_SOURCES}
     ${TRANSLATION_SOURCES}
     src/main.cpp
@@ -89,6 +95,20 @@ set_target_properties(Translator PROPERTIES
 include(CTest)
 
 if(BUILD_TESTING)
+    add_executable(TranslatorPaddleProbe
+        tests/PaddleIntegrationProbe.cpp ${PADDLE_OCR_SOURCES} ${REALTIME_SOURCES} ${TRANSLATION_SOURCES}
+        src/app/CaptureCoordinator.cpp src/app/CaptureCoordinator.h
+        src/capture/RegionSelector.cpp src/capture/RegionSelector.h
+        src/ocr/OcrEngineFactory.cpp src/ocr/OcrEngineFactory.h
+        src/ocr/TesseractOcrEngine.cpp src/ocr/OcrImagePreprocessor.cpp
+        src/app/OcrCoordinator.cpp src/app/OcrCoordinator.h
+        src/capture/ScreenCaptureService.cpp
+        src/config/SettingsManager.cpp src/config/SettingsManager.h
+        src/gui/TranslationWindow.cpp src/gui/TranslationWindow.h
+        src/gui/SettingsDialog.cpp src/gui/SettingsDialog.h
+    )
+    target_include_directories(TranslatorPaddleProbe PRIVATE src)
+    target_link_libraries(TranslatorPaddleProbe PRIVATE TranslatorProviders Qt6::Gui Qt6::Widgets)
     add_executable(TranslatorTesseractBatch
         tools/ocr_benchmark/TesseractBatch.cpp
         src/ocr/TesseractOcrEngine.cpp src/ocr/TesseractOcrEngine.h
@@ -101,11 +121,30 @@ if(BUILD_TESTING)
     endif()
     find_package(Python3 QUIET COMPONENTS Interpreter)
     if(Python3_Interpreter_FOUND)
+        add_test(NAME phase61b1_false_positive_analysis COMMAND ${Python3_EXECUTABLE}
+            -m unittest discover -s tools/ocr_false_positive_analysis -p test_*.py)
+        set_tests_properties(phase61b1_false_positive_analysis PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+        add_test(NAME phase61b_helper_protocol COMMAND ${Python3_EXECUTABLE}
+            -m unittest discover -s helpers/ocr -p test_*.py)
+        set_tests_properties(phase61b_helper_protocol PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
         add_test(NAME phase61a_benchmark_harness COMMAND ${Python3_EXECUTABLE}
             -m unittest discover -s tools/ocr_benchmark -p test_*.py)
         set_tests_properties(phase61a_benchmark_harness PROPERTIES
             WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
     endif()
+    add_executable(TranslatorPhase61Tests
+        tests/Phase61PaddleTest.cpp ${PADDLE_OCR_SOURCES}
+        src/ocr/OcrEngineFactory.h src/ocr/OcrEngineFactory.cpp
+        src/ocr/TesseractOcrEngine.h src/ocr/TesseractOcrEngine.cpp
+        src/ocr/OcrImagePreprocessor.h src/ocr/OcrImagePreprocessor.cpp
+        src/app/OcrCoordinator.h src/app/OcrCoordinator.cpp
+        src/config/SettingsManager.h src/config/SettingsManager.cpp
+        src/gui/SettingsDialog.h src/gui/SettingsDialog.cpp
+    )
+    target_include_directories(TranslatorPhase61Tests PRIVATE src)
+    target_link_libraries(TranslatorPhase61Tests PRIVATE TranslatorProviders Qt6::Gui Qt6::Widgets)
+    add_test(NAME phase61b_persistent_helper COMMAND TranslatorPhase61Tests)
+    set_tests_properties(phase61b_persistent_helper PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 30)
     add_executable(TranslatorPhase6Tests
         tests/Phase6RealtimeTest.cpp
         ${REALTIME_SOURCES}

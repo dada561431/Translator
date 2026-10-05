@@ -57,6 +57,7 @@ void SettingsDialog::createUi()
     ocrEngineCombo_ = new QComboBox(this);
     ocrEngineCombo_->setObjectName(QStringLiteral("ocrEngineCombo"));
     ocrEngineCombo_->addItem(tr("Tesseract"), QStringLiteral("tesseract"));
+    ocrEngineCombo_->addItem(tr("PP-OCRv6 Small"), QStringLiteral("paddle-small"));
     translatorCombo_ = new QComboBox(this);
     translatorCombo_->setObjectName(QStringLiteral("translatorCombo"));
     for (const auto &info : TranslationProviderRegistry::providers())
@@ -128,6 +129,8 @@ void SettingsDialog::loadSettings()
     selectById(sourceLanguageCombo_, settings_.sourceLanguage());
     selectById(targetLanguageCombo_, settings_.targetLanguage());
     selectById(ocrEngineCombo_, settings_.ocrEngine());
+    sourceLanguageCombo_->setItemText(0, settings_.ocrEngine() == QLatin1String("tesseract")
+                                     ? tr("Auto (English OCR)") : tr("Auto"));
     selectById(translatorCombo_, settings_.translator());
     selectById(planCombo_, settings_.deepLEndpoint().contains(QStringLiteral("api.deepl.com"))
                            ? QStringLiteral("pro") : QStringLiteral("free"));
@@ -146,6 +149,8 @@ void SettingsDialog::connectSettings()
     });
     connect(ocrEngineCombo_, &QComboBox::currentIndexChanged, this, [this](int index) {
         settings_.setOcrEngine(ocrEngineCombo_->itemData(index).toString());
+        sourceLanguageCombo_->setItemText(0, settings_.ocrEngine() == QLatin1String("tesseract")
+                                         ? tr("Auto (English OCR)") : tr("Auto"));
     });
     connect(translatorCombo_, &QComboBox::currentIndexChanged, this, [this](int index) {
         settings_.setTranslator(translatorCombo_->itemData(index).toString());
