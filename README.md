@@ -2,6 +2,20 @@
 
 `Translator` 是一个基于 Qt 6、C++17 和 Qt Widgets 的实时屏幕文字识别与翻译程序。本项目参考 LunaTranslator 的架构和功能设计，但采用独立的 Qt 6/C++ 实现；原 LunaTranslator 源码保持独立且不受本工程影响。
 
+## Phase 6.1A OCR Evaluation
+
+Independent local benchmark tooling is available in `tools/ocr_benchmark/` and
+`benchmarks/ocr_phase61a/`. Ten distinct user-confirmed Bilibili subtitle crops
+were compared using the unchanged production Tesseract pipeline and official
+PP-OCRv6 small/medium CPU pipelines. Exact matches: 1/10, 9/10 and 8/10;
+micro CER: 70.27%, 2.70%, 2.70%. Successful Paddle runs explicitly disable
+MKL-DNN after a Windows runtime incompatibility. Small is the recommended
+future candidate, not an installed production backend. All private images,
+labels, models, runtimes and raw reports remain local and ignored.
+See `docs/ocr-scene-text-evaluation-phase61a.md` for latency, failure cases,
+limited scene coverage and researched Windows/MinGW deployment routes.
+This paused-frame benchmark does not complete Phase 6 continuous-video acceptance.
+
 ## Phase 6 Real-time Pipeline
 
 Region → Start → periodic Capture / OCR / optional Translation → Stop.
@@ -204,7 +218,7 @@ components.
 ## 尚未实现
 
 - 完整 Bilibili 连续字幕与桌面长期稳定性验收
-- PaddleOCR / Phase 6.1
+- Production PaddleOCR backend / Phase 6.1B (Phase 6.1A evaluation is separate)
 - Overlay click-through
 - Hook
 - TTS

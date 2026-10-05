@@ -89,6 +89,23 @@ set_target_properties(Translator PROPERTIES
 include(CTest)
 
 if(BUILD_TESTING)
+    add_executable(TranslatorTesseractBatch
+        tools/ocr_benchmark/TesseractBatch.cpp
+        src/ocr/TesseractOcrEngine.cpp src/ocr/TesseractOcrEngine.h
+        src/ocr/OcrImagePreprocessor.cpp src/ocr/OcrImagePreprocessor.h
+    )
+    target_include_directories(TranslatorTesseractBatch PRIVATE src)
+    target_link_libraries(TranslatorTesseractBatch PRIVATE Qt6::Core Qt6::Gui)
+    if(WIN32)
+        target_link_libraries(TranslatorTesseractBatch PRIVATE psapi)
+    endif()
+    find_package(Python3 QUIET COMPONENTS Interpreter)
+    if(Python3_Interpreter_FOUND)
+        add_test(NAME phase61a_benchmark_harness COMMAND ${Python3_EXECUTABLE}
+            -m unittest discover -s tools/ocr_benchmark -p test_*.py)
+        set_tests_properties(phase61a_benchmark_harness PROPERTIES
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+    endif()
     add_executable(TranslatorPhase6Tests
         tests/Phase6RealtimeTest.cpp
         ${REALTIME_SOURCES}

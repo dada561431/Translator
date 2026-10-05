@@ -40,3 +40,13 @@ key.txt
 secret.json
 *.traineddata
 last_capture.png
+
+# Local scene-text evaluation data, runtimes and generated reports
+benchmarks/ocr_phase61a/private/
+benchmarks/ocr_phase61a/results/
+benchmarks/ocr_phase61a/models/
+benchmarks/ocr_phase61a/.venv/
+benchmarks/ocr_phase61a/.cache/
+benchmarks/ocr_phase61a/smoke/
+__pycache__/
+*.pyc

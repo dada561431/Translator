@@ -422,6 +422,24 @@ placing either application window inside the capture region.
 See `realtime-pipeline-phase6.md` for provisional thresholds, automated results,
 synthetic real-Tesseract performance and the blocked manual/video acceptance.
 
+## Phase 6.1A: Isolated Scene-text Evaluation
+
+`TranslatorTesseractBatch` is a BUILD_TESTING-only executable which calls the
+unchanged production `TesseractOcrEngine::recognize` and records preprocessing,
+PSM, warm timings and working-set snapshots. `tools/ocr_benchmark/run_benchmark.py`
+validates a local private manifest and coordinates this baseline plus separate
+PP-OCRv6 small/medium Python workers. Input image hashes and all failures are
+retained; models, screenshots, labels, cache and raw reports are Git-ignored.
+The optional Python CTest only exercises stdlib metrics/manifest contracts, not
+network or model inference. Qt application source/dependencies are unchanged.
+
+This is not the production OCR factory or a persistent-helper implementation.
+The current ten-frame evaluation recommends investigating small with a resident
+helper across the MinGW/process boundary, rather than directly linking MSVC
+Paddle C++ into Qt. ONNX C-API parity is a potential later route, not verified
+integration. No IOcrEngine, Settings, OCR coordinator or realtime algorithm was
+changed. See `ocr-scene-text-evaluation-phase61a.md` for evidence and scope limits.
+
 ## Native Dependencies
 
 以下依赖来自源码和 native CMake，Phase 1 均未迁移或链接。
