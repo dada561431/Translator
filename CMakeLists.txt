@@ -21,6 +21,7 @@ if(WIN32)
 endif()
 
 set(OVERLAY_INTERACTION_SOURCES
+    src/gui/OverlayTrayController.h src/gui/OverlayTrayController.cpp
     src/app/GlobalShortcutManager.h src/app/GlobalShortcutManager.cpp
     src/app/OverlayInteractionController.h src/app/OverlayInteractionController.cpp
 )
@@ -115,6 +116,21 @@ set_target_properties(Translator PROPERTIES
 include(CTest)
 
 if(BUILD_TESTING)
+    add_executable(TranslatorPhase7ControlsTests tests/Phase7OverlayControlsTest.cpp
+        ${OVERLAY_INTERACTION_SOURCES}
+        src/config/SettingsManager.cpp src/config/SettingsManager.h
+        src/gui/SettingsDialog.cpp src/gui/SettingsDialog.h
+        src/gui/TranslationWindow.cpp src/gui/TranslationWindow.h
+        src/app/CaptureCoordinator.cpp src/app/CaptureCoordinator.h
+        src/capture/RegionSelector.cpp src/capture/RegionSelector.h
+        src/capture/ScreenCaptureService.cpp)
+    target_include_directories(TranslatorPhase7ControlsTests PRIVATE src)
+    target_link_libraries(TranslatorPhase7ControlsTests PRIVATE TranslatorProviders TranslatorOverlayPlatform)
+    if(WIN32)
+        target_link_libraries(TranslatorPhase7ControlsTests PRIVATE user32)
+    endif()
+    add_test(NAME phase7b2_overlay_controls COMMAND TranslatorPhase7ControlsTests)
+    set_tests_properties(phase7b2_overlay_controls PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
     add_executable(TranslatorPhase7BTests
         tests/Phase7CaptureAppearanceTest.cpp
         src/config/SettingsManager.cpp src/config/SettingsManager.h
@@ -155,6 +171,7 @@ if(BUILD_TESTING)
     target_link_libraries(TranslatorRuntimeLocatorTests PRIVATE Qt6::Core Qt6::Gui)
     add_test(NAME phase61c_runtime_locator COMMAND TranslatorRuntimeLocatorTests)
     add_executable(TranslatorPaddleProbe
+        ${OVERLAY_INTERACTION_SOURCES}
         tests/PaddleIntegrationProbe.cpp ${PADDLE_OCR_SOURCES} ${REALTIME_SOURCES} ${TRANSLATION_SOURCES}
         src/app/CaptureCoordinator.cpp src/app/CaptureCoordinator.h
         src/capture/RegionSelector.cpp src/capture/RegionSelector.h
@@ -168,6 +185,9 @@ if(BUILD_TESTING)
     )
     target_include_directories(TranslatorPaddleProbe PRIVATE src)
     target_link_libraries(TranslatorPaddleProbe PRIVATE TranslatorProviders Qt6::Gui Qt6::Widgets)
+    if(WIN32)
+        target_link_libraries(TranslatorPaddleProbe PRIVATE user32)
+    endif()
     add_executable(TranslatorTesseractBatch
         tools/ocr_benchmark/TesseractBatch.cpp
         src/ocr/TesseractOcrEngine.cpp src/ocr/TesseractOcrEngine.h

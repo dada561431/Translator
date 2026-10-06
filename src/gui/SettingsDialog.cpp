@@ -17,6 +17,9 @@
 #include <QVBoxLayout>
 #include <QDoubleSpinBox>
 #include <QSpinBox>
+#include <QKeySequenceEdit>
+#include <QScrollArea>
+#include <QScreen>
 
 SettingsDialog::SettingsDialog(SettingsManager &settings, QWidget *parent, ICredentialStore *credentials)
     : QDialog(parent), settings_(settings)
@@ -27,6 +30,7 @@ SettingsDialog::SettingsDialog(SettingsManager &settings, QWidget *parent, ICred
     setWindowTitle(tr("Translator Settings"));
     setModal(false);
     setMinimumWidth(460);
+    resize(520, 640);
     createUi();
     loadSettings();
     connectSettings();
@@ -37,11 +41,20 @@ void SettingsDialog::showEvent(QShowEvent *event)
     clearDrafts();
     loadSettings();
     QDialog::showEvent(event);
+    if (screen()) setMaximumHeight(qMax(300, screen()->availableGeometry().height() - 60));
 }
 
 void SettingsDialog::createUi()
 {
     auto *layout = new QVBoxLayout(this);
+    auto *scroll = new QScrollArea(this);
+    scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
+    auto *body = new QWidget(scroll);
+    auto *content = new QVBoxLayout(body);
+    content->setContentsMargins(0, 0, 0, 0);
+    scroll->setWidget(body);
+    layout->addWidget(scroll);
     form_ = new QFormLayout();
     form_->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
     sourceLanguageCombo_ = new QComboBox(this);
@@ -106,10 +119,10 @@ void SettingsDialog::createUi()
     editor->addWidget(apiKeyEdit_, 1);
     editor->addWidget(showKey_);
     form_->addRow(tr("New API Key"), keyEditor_);
-    layout->addLayout(form_);
+    content->addLayout(form_);
     privacyLabel_ = new QLabel(tr("识别出的文字将发送至所选翻译服务。"), this);
     privacyLabel_->setWordWrap(true);
-    layout->addWidget(privacyLabel_);
+    content->addWidget(privacyLabel_);
     auto *overlayForm = new QFormLayout();
     translationFontSize_ = new QDoubleSpinBox(this);
     translationFontSize_->setObjectName(QStringLiteral("translationFontSizeSpin"));
@@ -140,7 +153,17 @@ void SettingsDialog::createUi()
     overlayForm->addRow(showOriginal_);
     overlayForm->addRow(excludeFromCapture_);
     overlayForm->addRow(captureExclusionNote_);
-    layout->addLayout(overlayForm);
+    dragLocked_ = new QCheckBox(tr("Lock overlay position"), this);
+    dragLocked_->setObjectName(QStringLiteral("dragLockedCheck"));
+    overlayForm->addRow(dragLocked_);
+    const QStringList labels{tr("Toggle interaction"), tr("Select region"), tr("Start / Stop")};
+    const QStringList names{QStringLiteral("toggleInteractionHotkey"), QStringLiteral("regionHotkey"), QStringLiteral("startStopHotkey")};
+    for (int i = 0; i < 3; ++i) {
+        hotkeyEdits_[i] = new QKeySequenceEdit(this);
+        hotkeyEdits_[i]->setObjectName(names[i]);
+        overlayForm->addRow(labels[i], hotkeyEdits_[i]);
+    }
+    content->addLayout(overlayForm);
     setCaptureExclusionAvailable(WindowCaptureExclusion::platformSupported());
     errorLabel_ = new QLabel(this);
     errorLabel_->setObjectName(QStringLiteral("credentialError"));
@@ -185,6 +208,10 @@ void SettingsDialog::loadOverlaySettings()
     showTranslation_->setChecked(appearance.showTranslation);
     showOriginal_->setChecked(appearance.showOriginal);
     excludeFromCapture_->setChecked(settings_.overlayExcludeFromCapture());
+    dragLocked_->setChecked(settings_.overlayDragLocked());
+    const auto hotkeys = settings_.globalHotkeys();
+    for (int i = 0; i < 3; ++i)
+        hotkeyEdits_[i]->setKeySequence(QKeySequence(hotkeys.shortcuts[i], QKeySequence::PortableText));
     updateVisibilityChecks();
 }
 
@@ -281,6 +308,13 @@ void SettingsDialog::updateCredentialStatus()
 bool SettingsDialog::applyCredentials()
 {
     errorLabel_->clear();
+    GlobalHotkeyConfig requested, canonical;
+    std::array<GlobalHotkeyChord, 3> chords;
+    QString hotkeyError;
+    for (int i = 0; i < 3; ++i) requested.shortcuts[i] = hotkeyEdits_[i]->keySequence().toString(QKeySequence::PortableText);
+    if (!parseGlobalHotkeys(requested, canonical, chords, hotkeyError)) {
+        errorLabel_->setText(hotkeyError); return false;
+    }
     const auto *info = TranslationProviderRegistry::find(displayedProvider_);
     if (info && info->supportsCustomEndpoint) {
         QString error;
@@ -292,6 +326,11 @@ bool SettingsDialog::applyCredentials()
             errorLabel_->setText(tr("Please configure a model."));
             return false;
         }
+    }
+    if (hotkeyApply_) {
+        if (!hotkeyApply_(canonical, hotkeyError)) { errorLabel_->setText(hotkeyError); return false; }
+    } else if (canonical.shortcuts != settings_.globalHotkeys().shortcuts) {
+        errorLabel_->setText(tr("Global shortcut registration unavailable.")); return false;
     }
     for (const auto &id : drafts_.keys()) {
         const auto draft = drafts_.value(id);
@@ -319,6 +358,7 @@ bool SettingsDialog::applyCredentials()
         backgroundOpacity_->value(), showTranslation_->isChecked(), showOriginal_->isChecked()});
     if (excludeFromCapture_->isEnabled())
         settings_.setOverlayExcludeFromCapture(excludeFromCapture_->isChecked());
+    settings_.setOverlayDragLocked(dragLocked_->isChecked());
     const QSignalBlocker blocker(apiKeyEdit_);
     apiKeyEdit_->clear();
     updateProvider();

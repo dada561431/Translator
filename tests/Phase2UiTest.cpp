@@ -127,7 +127,8 @@ int main(int argc, char *argv[])
         check(window.windowFlags().testFlag(Qt::WindowStaysOnTopHint), "always-on-top flag is set");
         check(window.testAttribute(Qt::WA_TranslucentBackground), "translucent background is enabled");
         check(window.width() > window.height() * 2, "default window is wide and subtitle-shaped");
-        check(window.minimumSize() == QSize(420, 120), "empty overlay keeps an operable minimum size");
+        check(window.minimumWidth() >= 420 && window.minimumHeight() == 120,
+              "empty overlay keeps an operable minimum size including its toolbar controls");
 
         auto *toolbar = requiredChild<QWidget>(window, "toolbar");
         auto *subtitleArea = requiredChild<QWidget>(window, "subtitleArea");

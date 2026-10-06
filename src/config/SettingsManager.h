@@ -7,6 +7,7 @@
 #include <QString>
 #include <QStringList>
 #include "config/OverlayAppearance.h"
+#include "config/GlobalHotkeyConfig.h"
 
 class SettingsManager final : public QObject
 {
@@ -24,6 +25,10 @@ public:
     QString openAiModel() const;
     QByteArray windowGeometry() const;
     bool overlayClickThrough() const;
+    bool overlayDragLocked() const;
+    GlobalHotkeyConfig globalHotkeys() const;
+    void setGlobalHotkeys(const GlobalHotkeyConfig &config);
+    void setOverlayDragLocked(bool locked);
     bool overlayExcludeFromCapture() const;
     OverlayAppearance overlayAppearance() const;
     QRect captureRegion() const;
@@ -46,6 +51,7 @@ public:
 signals:
     void translationSettingsChanged();
     void overlayAppearanceChanged();
+    void overlayDragLockedChanged();
     void overlayCaptureExclusionChanged();
 
 private:

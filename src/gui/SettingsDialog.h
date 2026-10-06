@@ -4,6 +4,10 @@
 #include <QHash>
 #include <memory>
 #include "credentials/ICredentialStore.h"
+#include "config/GlobalHotkeyConfig.h"
+#include <functional>
+#include <utility>
+class QKeySequenceEdit;
 
 class QComboBox;
 class QShowEvent;
@@ -23,6 +27,7 @@ public:
                             ICredentialStore *credentials = nullptr);
     void reject() override;
     void setCaptureExclusionAvailable(bool available);
+    void setHotkeyApplyHandler(std::function<bool(const GlobalHotkeyConfig &, QString &)> handler) { hotkeyApply_ = std::move(handler); }
 
 protected:
     void showEvent(QShowEvent *event) override;
@@ -69,4 +74,7 @@ private:
     QCheckBox *showOriginal_ = nullptr;
     QCheckBox *excludeFromCapture_ = nullptr;
     QLabel *captureExclusionNote_ = nullptr;
+    QCheckBox *dragLocked_ = nullptr;
+    std::array<QKeySequenceEdit *, 3> hotkeyEdits_{};
+    std::function<bool(const GlobalHotkeyConfig &, QString &)> hotkeyApply_;
 };

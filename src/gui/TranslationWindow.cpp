@@ -23,6 +23,8 @@
 #include <QVBoxLayout>
 #include <QWindow>
 #include <QShowEvent>
+#include <QHideEvent>
+#include <QSignalBlocker>
 #include <QDebug>
 #include <utility>
 
@@ -42,12 +44,15 @@ QGraphicsDropShadowEffect *createSubtitleShadow(QObject *parent, int blurRadius)
 } // namespace
 
 TranslationWindow::TranslationWindow(SettingsManager &settings, QWidget *parent, ICredentialStore *credentials,
-                                     WindowCaptureExclusion::Backend captureBackend)
+                                     WindowCaptureExclusion::Backend captureBackend, GeometryBackend geometryBackend)
     : QWidget(parent,
               Qt::Window | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint)
     , settings_(settings)
     , captureExclusion_(std::move(captureBackend))
+    , geometryBackend_(std::move(geometryBackend))
 {
+    if (!geometryBackend_.move) geometryBackend_.move = [this] { return windowHandle()->startSystemMove(); };
+    if (!geometryBackend_.resize) geometryBackend_.resize = [this](Qt::Edges edges) { return windowHandle()->startSystemResize(edges); };
     setObjectName(QStringLiteral("translationWindow"));
     setWindowTitle(QStringLiteral("Translator"));
     setAttribute(Qt::WA_TranslucentBackground);
@@ -64,6 +69,8 @@ TranslationWindow::TranslationWindow(SettingsManager &settings, QWidget *parent,
     settingsDialog_ = new SettingsDialog(settings_, this, credentials);
     connect(&settings_, &SettingsManager::overlayAppearanceChanged, this, &TranslationWindow::applyAppearance);
     connect(&settings_, &SettingsManager::overlayCaptureExclusionChanged, this, &TranslationWindow::applyCaptureExclusion);
+    connect(&settings_, &SettingsManager::overlayDragLockedChanged, this, [this] { setDragLocked(settings_.overlayDragLocked()); });
+    setDragLocked(settings_.overlayDragLocked());
     applyAppearance();
     restoreWindowGeometry();
 }
@@ -83,7 +90,7 @@ void TranslationWindow::applyAppearance()
     const int contentHeight = (appearance.showTranslation ? translatedLabel_->fontMetrics().height() : 0)
         + (appearance.showOriginal ? originalLabel_->fontMetrics().height() : 0)
         + (appearance.showOriginal && appearance.showTranslation ? 5 : 0) + 30;
-    setMinimumSize(420, qMax(120, contentHeight));
+    setMinimumSize(qMax(420, toolbar_->minimumSizeHint().width() + 16), qMax(120, contentHeight));
     updateGeometry();
 }
 
@@ -118,6 +125,25 @@ void TranslationWindow::showEvent(QShowEvent *event)
 {
     QWidget::showEvent(event);
     applyCaptureExclusion();
+    emit overlayVisibilityChanged();
+}
+
+void TranslationWindow::hideEvent(QHideEvent *event)
+{
+    QWidget::hideEvent(event);
+    emit overlayVisibilityChanged();
+}
+
+void TranslationWindow::setDragLocked(bool locked)
+{
+    const bool changed = dragLocked_ != locked;
+    dragLocked_ = locked;
+    unsetCursor();
+    const QSignalBlocker blocker(lockButton_);
+    lockButton_->setChecked(locked);
+    lockButton_->setText(locked ? tr("Unlock") : tr("Lock"));
+    lockButton_->setToolTip(locked ? tr("Unlock overlay position") : tr("Lock overlay position"));
+    if (changed) emit dragLockedChanged();
 }
 
 void TranslationWindow::setInteractionMode(OverlayInteractionMode mode)
@@ -152,6 +178,7 @@ void TranslationWindow::setInteractionMode(OverlayInteractionMode mode)
     interactionFeedback_->show();
     interactionFeedback_->raise();
     interactionFeedbackTimer_->start();
+    emit interactionModeChanged();
 }
 
 void TranslationWindow::setTranslatedText(const QString &text)
@@ -211,10 +238,11 @@ bool TranslationWindow::eventFilter(QObject *watched, QEvent *event)
         scheduleToolbarHide();
     }
 
+    if (!geometryInteractionAllowed()) return QWidget::eventFilter(watched, event);
     if (watched == toolbar_ && event->type() == QEvent::MouseButtonPress) {
         const auto *mouseEvent = static_cast<QMouseEvent *>(event);
         if (mouseEvent->button() == Qt::LeftButton && windowHandle()) {
-            return windowHandle()->startSystemMove();
+            return geometryBackend_.move();
         }
     }
 
@@ -229,8 +257,7 @@ bool TranslationWindow::eventFilter(QObject *watched, QEvent *event)
             if (mouseEvent->button() == Qt::LeftButton && windowHandle()) {
                 const Qt::Edges edges = resizeEdgesAt(
                     subtitleArea_->mapTo(this, mouseEvent->position().toPoint()));
-                return edges ? windowHandle()->startSystemResize(edges)
-                             : windowHandle()->startSystemMove();
+                return edges ? geometryBackend_.resize(edges) : geometryBackend_.move();
             }
         } else if (mouseEventType == QEvent::Leave) {
             unsetCursor();
@@ -276,6 +303,7 @@ void TranslationWindow::closeEvent(QCloseEvent *event)
     }
     settings_.setWindowGeometry(saveGeometry());
     QWidget::closeEvent(event);
+    emit closed();
 }
 
 void TranslationWindow::createUi()
@@ -316,9 +344,13 @@ void TranslationWindow::createUi()
     settingsButton_->setObjectName(QStringLiteral("settingsButton"));
     closeButton_ = new QPushButton(tr("Close"), toolbar_);
     closeButton_->setObjectName(QStringLiteral("closeButton"));
+    lockButton_ = new QPushButton(tr("Lock"), toolbar_);
+    lockButton_->setObjectName(QStringLiteral("lockButton"));
+    lockButton_->setCheckable(true);
+    lockButton_->setFixedWidth(lockButton_->fontMetrics().horizontalAdvance(tr("Unlock")) + 24);
 
     const QList<QPushButton *> toolbarButtons = {
-        regionButton_, startButton_, stopButton_, settingsButton_, closeButton_};
+        regionButton_, startButton_, stopButton_, settingsButton_, lockButton_, closeButton_};
     for (QPushButton *button : toolbarButtons) {
         button->installEventFilter(this);
     }
@@ -327,6 +359,7 @@ void TranslationWindow::createUi()
     toolbarLayout->addWidget(startButton_);
     toolbarLayout->addWidget(stopButton_);
     toolbarLayout->addWidget(settingsButton_);
+    toolbarLayout->addWidget(lockButton_);
     toolbarLayout->addWidget(closeButton_);
     subtitleArea_ = new QWidget(this);
     subtitleArea_->setObjectName(QStringLiteral("subtitleArea"));
@@ -440,16 +473,34 @@ void TranslationWindow::connectControls()
     interactionFeedbackTimer_->setInterval(1000);
     connect(interactionFeedbackTimer_, &QTimer::timeout, interactionFeedback_, &QWidget::hide);
 
-    connect(regionButton_, &QPushButton::clicked,
-            this, &TranslationWindow::regionSelectionRequested);
-    connect(startButton_, &QPushButton::clicked, this, &TranslationWindow::startRequested);
-    connect(stopButton_, &QPushButton::clicked, this, &TranslationWindow::stopRequested);
-    connect(settingsButton_, &QPushButton::clicked, this, [this] {
-        settingsDialog_->show();
-        settingsDialog_->raise();
-        settingsDialog_->activateWindow();
-    });
-    connect(closeButton_, &QPushButton::clicked, this, &QWidget::close);
+    connect(regionButton_, &QPushButton::clicked, this, [this] { requestControl(OverlayControlAction::SelectRegion); });
+    connect(startButton_, &QPushButton::clicked, this, [this] { requestControl(OverlayControlAction::Start); });
+    connect(stopButton_, &QPushButton::clicked, this, [this] { requestControl(OverlayControlAction::Stop); });
+    connect(settingsButton_, &QPushButton::clicked, this, [this] { requestControl(OverlayControlAction::OpenSettings); });
+    connect(lockButton_, &QPushButton::clicked, this, [this] { requestControl(OverlayControlAction::ToggleLock); });
+    connect(closeButton_, &QPushButton::clicked, this, [this] { requestControl(OverlayControlAction::Exit); });
+}
+
+void TranslationWindow::openSettings()
+{
+    settingsDialog_->show();
+    settingsDialog_->raise();
+    settingsDialog_->activateWindow();
+}
+
+void TranslationWindow::requestControl(OverlayControlAction action)
+{
+    if (controlRouter_) { controlRouter_(action); return; }
+    // Standalone widgets/probes retain their original signal contract.
+    switch (action) {
+    case OverlayControlAction::SelectRegion: emit regionSelectionRequested(); break;
+    case OverlayControlAction::Start: emit startRequested(); break;
+    case OverlayControlAction::Stop: emit stopRequested(); break;
+    case OverlayControlAction::OpenSettings: openSettings(); break;
+    case OverlayControlAction::ToggleLock: settings_.setOverlayDragLocked(!dragLocked_); break;
+    case OverlayControlAction::Exit: close(); break;
+    default: break;
+    }
 }
 
 void TranslationWindow::setTranslationRunning(bool running)

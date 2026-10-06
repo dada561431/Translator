@@ -6,6 +6,35 @@
 #include <QFont>
 #include <cmath>
 
+bool SettingsManager::overlayDragLocked() const
+{
+    return settings_.value(QStringLiteral("overlay/dragLocked"), false).toBool();
+}
+void SettingsManager::setOverlayDragLocked(bool locked)
+{
+    const bool changed = overlayDragLocked() != locked;
+    settings_.setValue(QStringLiteral("overlay/dragLocked"), locked);
+    settings_.sync();
+    if (changed) emit overlayDragLockedChanged();
+}
+GlobalHotkeyConfig SettingsManager::globalHotkeys() const
+{
+    GlobalHotkeyConfig config;
+    const QStringList keys{QStringLiteral("hotkeys/toggleInteraction"), QStringLiteral("hotkeys/region"), QStringLiteral("hotkeys/startStop")};
+    for (int i = 0; i < 3; ++i) config.shortcuts[i] = settings_.value(keys[i], config.shortcuts[i]).toString();
+    return config; // Do not overwrite malformed preferences on read.
+}
+void SettingsManager::setGlobalHotkeys(const GlobalHotkeyConfig &config)
+{
+    GlobalHotkeyConfig canonical;
+    std::array<GlobalHotkeyChord, 3> chords;
+    QString error;
+    if (!parseGlobalHotkeys(config, canonical, chords, error)) return;
+    const QStringList keys{QStringLiteral("hotkeys/toggleInteraction"), QStringLiteral("hotkeys/region"), QStringLiteral("hotkeys/startStop")};
+    for (int i = 0; i < 3; ++i) settings_.setValue(keys[i], canonical.shortcuts[i]);
+    settings_.sync();
+}
+
 namespace {
 
 const QString kSourceLanguageKey = QStringLiteral("language/source");

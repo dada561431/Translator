@@ -17,6 +17,7 @@
 #include "app/OverlayInteractionController.h"
 #include "config/SettingsManager.h"
 #include "gui/TranslationWindow.h"
+#include "gui/OverlayTrayController.h"
 #include "ocr/OcrEngineFactory.h"
 #include "translator/TranslatorFactory.h"
 #include "credentials/ICredentialStore.h"
@@ -37,6 +38,7 @@ int main(int argc, char *argv[])
     }
 #endif
     QApplication application(argc, argv);
+    application.setQuitOnLastWindowClosed(false);
     QCoreApplication::setOrganizationName(QStringLiteral("TranslatorProject"));
     QApplication::setApplicationName(QStringLiteral("Translator"));
     if (application.arguments().contains(QStringLiteral("--self-check"))) {
@@ -47,7 +49,7 @@ int main(int argc, char *argv[])
     SettingsManager settings;
     auto credentials = createPlatformCredentialStore();
     TranslationWindow translationWindow(settings, nullptr, credentials.get());
-    CaptureCoordinator captureCoordinator(translationWindow, settings);
+    CaptureCoordinator captureCoordinator(translationWindow, settings, nullptr, false);
     const auto helperOptions = PaddleHelperOptions::fromEnvironment();
     OcrCoordinator ocrCoordinator({}, nullptr, [helperOptions](const QString &engineId) {
         return OcrEngineFactory::create(engineId, helperOptions);
@@ -56,8 +58,6 @@ int main(int argc, char *argv[])
         return TranslatorFactory::create(settings, *credentials);
     });
     RealtimePipelineCoordinator realtime(settings, ocrCoordinator, translationCoordinator);
-    QObject::connect(&translationWindow, &TranslationWindow::startRequested,
-                     &realtime, [&] { realtime.start(); });
     QObject::connect(&translationWindow, &TranslationWindow::stopRequested,
                      &realtime, &RealtimePipelineCoordinator::stop);
     QObject::connect(&captureCoordinator, &CaptureCoordinator::selectionStarted,
@@ -86,11 +86,19 @@ int main(int argc, char *argv[])
     GlobalShortcutManager shortcuts;
     OverlayInteractionController overlayInteraction(translationWindow, settings, shortcuts, {
         [&] { return captureCoordinator.isSelecting(); },
-        [&] { emit translationWindow.regionSelectionRequested(); },
+        [&] { captureCoordinator.beginSelection(); },
         [&] { return realtime.isRunning(); },
         [&] { realtime.start(); },
-        [&] { realtime.stop(); }
+        [&] { realtime.stop(); },
+        [&] { application.quit(); }
     });
+    OverlayTrayController tray(overlayInteraction, translationWindow);
+    QObject::connect(&realtime, &RealtimePipelineCoordinator::runningChanged,
+                     &overlayInteraction, &OverlayInteractionController::refreshState);
+    QObject::connect(&captureCoordinator, &CaptureCoordinator::selectionStarted,
+                     &overlayInteraction, &OverlayInteractionController::refreshState);
+    QObject::connect(&captureCoordinator, &CaptureCoordinator::selectionFinished,
+                     &overlayInteraction, &OverlayInteractionController::refreshState);
     QObject::connect(&application, &QCoreApplication::aboutToQuit, &shortcuts,
                      &GlobalShortcutManager::unregisterAll);
     overlayInteraction.initialize();

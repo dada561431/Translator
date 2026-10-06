@@ -2,6 +2,28 @@
 
 `Translator` 是一个基于 Qt 6、C++17 和 Qt Widgets 的实时屏幕文字识别与翻译程序。本项目参考 LunaTranslator 的架构和功能设计，但采用独立的 Qt 6/C++ 实现；原 LunaTranslator 源码保持独立且不受本工程影响。
 
+## Phase 7B.2 Overlay Controls
+
+Overlay position lock disables mouse dragging/resizing independently of
+Interactive/ClickThrough. Settings provides three editable global shortcuts;
+defaults remain Ctrl+Alt+T/R/S. Apply validates single modified, unique chords and
+stages all new registrations before replacing the old set. Conflicts preserve the
+old shortcuts and saved configuration; Cancel discards shortcut/lock drafts.
+
+The system tray provides Show/Hide, Interaction, Lock, Region, Start/Stop, Settings
+and Exit. Hiding affects only the overlay, not OCR/translation. Double-click restores
+Show + Interactive. Close still exits; hidden Region selection restores the previous
+visibility. Notification-area unavailability keeps the window recoverable.
+
+Implementation and automated regression PASS: Release/Debug **16/16 CTest suites**.
+Real PP-OCRv6 Small replay with hidden/locked overlay and warm restart passes.
+Controlled native shortcut-conflict rollback passes. This desktop already owns
+Ctrl+Alt+S elsewhere (Win32 1409); configure another key or use the toolbar/tray.
+Full new-control desktop acceptance, DPI and multi-monitor remain pending.
+This round's real DeepL calls timed out (HTTP 0), so live DeepL is not marked PASS.
+See [Phase 7B.2 architecture, evidence and acceptance checklist](docs/overlay-controls-phase7b2.md).
+No new package/license work, Installer, Audio/ASR or Phase 8.
+
 ## Phase 7B.1 Capture Exclusion and Subtitle Appearance
 
 Settings now provides independent Translation/Original font sizes (10-72 pt),
@@ -46,8 +68,9 @@ desktop. These are owner-reported results, not an agent-run desktop test.
 Windows 100%/150% DPI and multi-monitor remain pending / not tested.
 See [Phase 7A report and manual checks](docs/overlay-interaction-phase7a.md).
 Mouse passthrough is independent from capture exclusion. Phase 7B.1 adds the
-best-effort API and appearance controls described above; Phase 7B.2 and public
-redistribution/licensing work remain deferred; no new portable package.
+best-effort API and appearance controls described above; Phase 7B.2 adds the controls
+described at the top. Public redistribution/licensing work remains deferred; no new
+portable package.
 
 ## Phase 6.1C Portable Build Infrastructure
 

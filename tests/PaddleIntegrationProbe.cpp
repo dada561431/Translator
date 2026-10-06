@@ -10,10 +10,14 @@
 #include <QTemporaryDir>
 #include <QTextStream>
 #include <QTimer>
+#include <QAction>
+#include <QMenu>
 #include "app/OcrCoordinator.h"
 #include "app/CaptureCoordinator.h"
 #include "app/RealtimePipelineCoordinator.h"
 #include "app/TranslationCoordinator.h"
+#include "app/OverlayInteractionController.h"
+#include "gui/OverlayTrayController.h"
 #include "config/SettingsManager.h"
 #include "credentials/ICredentialStore.h"
 #include "gui/TranslationWindow.h"
@@ -151,8 +155,22 @@ int main(int argc, char **argv)
         return input;
     };
     RealtimePipelineCoordinator pipeline(settings, ocr, translation, nullptr, replayInput);
+    const bool controlsRegression = args.contains(QStringLiteral("--controls-regression"));
+    GlobalShortcutManager shortcuts(nullptr, {[](int, unsigned, QString &) { return true; }, [](int) {}});
+    std::unique_ptr<OverlayInteractionController> controls;
+    std::unique_ptr<OverlayTrayController> tray;
+    if (controlsRegression) {
+        controls = std::make_unique<OverlayInteractionController>(window, settings, shortcuts,
+            OverlayInteractionController::Actions{[] { return false; }, [] {}, [&] { return pipeline.isRunning(); },
+                [&] { pipeline.start(); }, [&] { pipeline.stop(); }});
+        tray = std::make_unique<OverlayTrayController>(*controls, window, nullptr, [] { return true; }, false);
+        controls->initialize();
+        QObject::connect(&pipeline, &RealtimePipelineCoordinator::runningChanged, controls.get(), &OverlayInteractionController::refreshState);
+    }
     const bool overlayRegression = args.contains(QStringLiteral("--overlay-regression"));
     bool appearanceKeepsSession = true;
+    bool controlsKeepSession = true;
+    int hiddenOcrSamples = 0, hiddenTranslations = 0;
     int clickThroughSamples = 0;
     QObject::connect(&window, &TranslationWindow::startRequested, &pipeline, [&] { pipeline.start(); });
     QObject::connect(&window, &TranslationWindow::stopRequested, &pipeline, &RealtimePipelineCoordinator::stop);
@@ -162,6 +180,7 @@ int main(int argc, char **argv)
     QObject::connect(&translation, &TranslationCoordinator::stateChanged, &window, &TranslationWindow::setTranslationState);
     QObject::connect(&translation, &TranslationCoordinator::resultReady, &window, [&](const TranslationResult &result) {
         if (result.success) window.setTranslatedText(result.translatedText);
+        if (result.success && !window.isVisible()) ++hiddenTranslations;
     });
     if (args[1] == QLatin1String("--manual")) {
         CaptureCoordinator capture(window, settings);
@@ -178,6 +197,13 @@ int main(int argc, char **argv)
     QObject::connect(&pipeline, &RealtimePipelineCoordinator::sampleAccepted, &app,
         [&](quint64, quint64, const OcrResult &result, qint64 latency) {
             record(result, latency);
+            if (controlsRegression) {
+                if (!window.isVisible()) ++hiddenOcrSamples;
+                const auto session = pipeline.sessionId();
+                controls->routeControl(OverlayControlAction::ToggleLock);
+                controls->routeControl(OverlayControlAction::HideOverlay);
+                controlsKeepSession = controlsKeepSession && pipeline.isRunning() && session == pipeline.sessionId();
+            }
             if (overlayRegression) {
                 if (window.interactionMode() == OverlayInteractionMode::ClickThrough) ++clickThroughSamples;
                 const auto session = pipeline.sessionId();
@@ -211,6 +237,11 @@ int main(int argc, char **argv)
                         const bool samePid = !restarted || (beforeRestartPid > 0 && beforeRestartPid
                             == samples.last().toObject().value("helper_pid").toVariant().toLongLong());
                         if (!samePid) ++failures;
+                        if (controlsRegression) {
+                            controls->routeControl(OverlayControlAction::ShowOverlay);
+                            if (!controlsKeepSession || hiddenOcrSamples < 2
+                                || (settings.translator() == "deepl" && hiddenTranslations < 2)) ++failures;
+                        }
                         auto *original = window.findChild<QLabel *>("originalLabel");
                         auto *translated = window.findChild<QLabel *>("translatedLabel");
                         const bool originalVisible = original && original->text() == text;
@@ -227,6 +258,12 @@ int main(int argc, char **argv)
                         }
                         // Only this application's rendered subtitles, never the surrounding desktop.
                         if (!window.grab().save(args[2] + ".png")) ++failures;
+                        bool trayExitStopped = true;
+                        if (controlsRegression) {
+                            tray->menu()->findChild<QAction *>(QStringLiteral("trayExit"))->trigger();
+                            trayExitStopped = !pipeline.isRunning() && !window.isVisible();
+                            if (!trayExitStopped) ++failures;
+                        }
                         finish({{"captures", qint64(pipeline.statistics().captures)},
                             {"unchanged", qint64(pipeline.statistics().unchangedFrames)},
                             {"original_visible", originalVisible}, {"translation_visible", translationVisible},
@@ -235,6 +272,10 @@ int main(int argc, char **argv)
                             {"overlay_regression", overlayRegression},
                             {"appearance_keeps_session", appearanceKeepsSession},
                             {"clickthrough_samples", clickThroughSamples},
+                            {"controls_regression", controlsRegression},
+                            {"controls_keep_session", controlsKeepSession},
+                            {"hidden_ocr_samples", hiddenOcrSamples}, {"hidden_translations", hiddenTranslations},
+                            {"tray_exit_routed", controlsRegression}, {"tray_exit_stopped_and_closed", trayExitStopped},
                             {"stop_halts_capture", captures == pipeline.statistics().captures}});
                     });
                 }

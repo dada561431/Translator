@@ -11,13 +11,13 @@
 #include <QTimer>
 
 CaptureCoordinator::CaptureCoordinator(TranslationWindow &window,
-                                       SettingsManager &settings, QObject *parent)
+                                       SettingsManager &settings, QObject *parent, bool connectWindow)
     : QObject(parent)
     , window_(window)
     , settings_(settings)
     , selector_(this)
 {
-    connect(&window_, &TranslationWindow::regionSelectionRequested,
+    if (connectWindow) connect(&window_, &TranslationWindow::regionSelectionRequested,
             this, [this] { beginSelection(); });
     connect(&selector_, &RegionSelector::regionSelected, this,
             [this](const QRect &region, QScreen *screen) {
@@ -49,6 +49,7 @@ void CaptureCoordinator::beginSelection()
     }
 
     selecting_ = true;
+    wasVisible_ = window_.isVisible();
     emit selectionStarted();
     window_.hide();
     QTimer::singleShot(80, this, [this] { selector_.start(); });
@@ -91,6 +92,8 @@ void CaptureCoordinator::captureSelectedRegion(const QRect &region, QScreen *scr
 void CaptureCoordinator::restoreWindow(const QString &feedback)
 {
     selecting_ = false;
-    window_.show();
+    if (wasVisible_) window_.show();
+    else window_.hide();
     window_.setRegionFeedback(feedback);
+    emit selectionFinished();
 }

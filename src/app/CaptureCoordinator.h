@@ -14,15 +14,16 @@ class CaptureCoordinator final : public QObject
 
 public:
     CaptureCoordinator(TranslationWindow &window, SettingsManager &settings,
-                       QObject *parent = nullptr);
+                       QObject *parent = nullptr, bool connectWindow = true);
     bool isSelecting() const { return selecting_; }
+    void beginSelection();
 
 signals:
     void selectionStarted();
+    void selectionFinished();
     void captureCompleted(const CaptureResult &result);
 
 private:
-    void beginSelection();
     void captureSelectedRegion(const QRect &region, QScreen *screen);
     void restoreWindow(const QString &feedback);
 
@@ -31,4 +32,5 @@ private:
     RegionSelector selector_;
     ScreenCaptureService captureService_;
     bool selecting_ = false;
+    bool wasVisible_ = false;
 };
