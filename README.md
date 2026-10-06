@@ -13,12 +13,18 @@ OCR, recreate the translation backend, or stop realtime processing.
 Windows capture exclusion is enabled by default and reapplied after native handle
 or interaction-mode changes. It is **best effort, OS/capture API dependent**, not
 a security or DRM guarantee. Unsupported/failed calls leave the app usable.
-**API integration and automated appearance checks PASS; production screenshot
-exclusion is NOT VERIFIED:** this desktop returned all-black input even without
-the overlay, so ON/OFF capture acceptance must be repeated on a working desktop.
-The overlay-over-region limitation remains unresolved until that test passes.
-Release/Debug: **15/15 CTest suites PASS**. Real PP-OCRv6 Small + DeepL image-replay
-regression passed; this is not a new live-desktop or foreground-hotkey acceptance.
+**Core acceptance PASS. Remaining environment-specific checks: DPI / multi-monitor.**
+The owner verified real Windows screenshots include the overlay with exclusion OFF
+and exclude it with exclusion ON, while the overlay remains physically visible.
+Interactive/ClickThrough, font sizes, background opacity, field visibility and the
+at-least-one-field guard work normally. Live OCR and DeepL continue after appearance
+changes; Ctrl+Alt+T/R/S have no regression. No obvious self-capture/OCR feedback was
+observed with the overlay covering Region in the tested setup.
+These are owner-reported manual results, not a new agent-run capture test. The earlier
+all-black agent probe remains inconclusive and is preserved in the report, not relabeled
+PASS. Actual 100%/150% DPI and multi-monitor remain pending / not tested.
+Release/Debug: **15/15 CTest suites PASS**; existing results rechecked for this doc-only
+follow-up. Real PP-OCRv6 Small + DeepL image-replay regression also passed.
 See [Phase 7B.1 evidence and manual procedure](docs/overlay-capture-appearance-phase7b1.md).
 No new package or license/release work was performed.
 

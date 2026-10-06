@@ -3,13 +3,21 @@
 ## Status and Scope
 
 Baseline: `8465098f5b8932181d1d4f83504be33887c2e535`.
+Implementation commit: `02c63bded97d1bd911155cc2a81277b3262a9880`.
+
+**Core acceptance PASS. Remaining environment-specific checks: DPI / multi-monitor.**
+The owner subsequently supplied the real Windows desktop manual results recorded
+below. These are owner-reported evidence, not a new agent-run screenshot/probe test.
+This acceptance follow-up changes only this document and README, not production code.
 
 - Basic Appearance: **PASS (automated UI, painting, persistence and lifecycle tests)**.
 - Capture Exclusion API Integration: **PASS (real Win32 calls/readback plus injected tests)**.
-- Production Qt Capture Exclusion: **NOT VERIFIED / acceptance blocked by invalid desktop capture**.
-- Full Phase 7B.1 manual acceptance: **not complete**. Do not claim OCR self-capture solved.
+- Windows Real Capture Exclusion Manual Acceptance: **PASS (owner-reported)**.
+- Capture Exclusion ON/OFF Real Behavior: **PASS (owner-reported)**.
+- Live OCR/Translation Appearance Regression: **PASS (owner-reported)**.
 - Release and Debug builds PASS; all **15/15 CTest suites PASS** in each build.
-- Actual PP-OCRv6 Small / DeepL regression PASS using local image replay, not live desktop capture.
+- Agent-run PP-OCRv6 Small / DeepL replay regression PASS; later owner-reported live
+  desktop regression PASS is separate evidence.
 - Phase 7A owner's previously reported core manual acceptance remains PASS. This is historical
   owner evidence, not a new foreground-input test. DPI 100%/150% and multi-monitor remain pending.
 
@@ -98,7 +106,10 @@ Tests verify Apply while the real coordinators run with controlled engines: unch
 session, unchanged OCR engine/factory and translator instance, continued text updates,
 and latest hidden content after reshow.
 
-## Production Capture Evidence
+## Historical Agent-Run Production Capture Evidence
+
+The following failed environment-specific attempt is retained verbatim as historical
+evidence. It is not the current core acceptance status and is not retroactively PASS.
 
 QA-only `TranslatorCaptureExclusionProbe` is built under BUILD_TESTING, not packaged
 or registered as an offscreen CTest. It creates a green lower window, overlaps it with
@@ -137,11 +148,40 @@ or security UI was automated. An observation run ended without a complete report
 it is not acceptance evidence. The reason for the unusable desktop capture is not
 established. The user was asked to confirm an unlocked, visible desktop.
 
-This does **not** prove that QScreen ignores display affinity, nor that exclusion
-works. No security workaround or capture-backend change was attempted. Whether the
-overlay is self-captured remains unknown; **overlay-over-region Known Limitation**
-stays open until a valid ON/OFF desktop comparison succeeds. Do not claim full capture
-exclusion PASS, a physically visible overlay observation, or a fix for OCR feedback.
+This attempt did **not** prove that QScreen ignores display affinity or that exclusion
+works. No security workaround or capture-backend change was attempted. The agent-run
+QScreen probe remains inconclusive; its all-black images are not positive evidence.
+The later owner-reported manual results below close the core desktop acceptance gap,
+without rewriting those probe results or claiming universal capture immunity.
+
+## Owner-Reported Windows Manual Acceptance
+
+The owner verified the following on a real Windows desktop after the implementation:
+
+| Manual check | Owner-reported result |
+| --- | --- |
+| Capture Exclusion OFF | PASS: Windows screenshots include Translator overlay |
+| Capture Exclusion ON | PASS: Windows screenshots exclude Translator overlay |
+| Physical overlay visibility | PASS: the user still sees the overlay normally |
+| Interactive / ClickThrough with exclusion | PASS: both modes work with exclusion |
+| Overlay overlapping Region | PASS: no obvious self-capture / OCR feedback observed |
+| Translation font size | PASS: adjustment works normally |
+| Original font size | PASS: adjustment works normally |
+| Background opacity | PASS: adjustment works; text stays clear |
+| Show Original / Show Translation | PASS: both visibility controls work |
+| At least one visible field | PASS: at least one field stays displayed |
+| Live OCR after appearance changes | PASS: realtime OCR continues normally |
+| Live DeepL after appearance changes | PASS: translation continues normally |
+| Ctrl+Alt+T / R / S | PASS: no regression reported |
+| Actual 100% / 150% DPI | Pending / not tested |
+| Multi-monitor | Pending / not tested |
+
+The screenshot API, screenshots, native HWND recreation and exact switch count were
+not supplied with this manual report; no new numerical/probe result is inferred.
+No obvious self-capture in the tested setup is a bounded observation, not a universal
+fix for OCR feedback. Capture exclusion remains best effort and OS/capture API dependent.
+The prior invalid agent baseline no longer blocks core acceptance given this later
+manual evidence; the agent probe's historical outcome remains unchanged.
 
 ## OCR and Translation Regression
 
@@ -166,10 +206,10 @@ realtime coordinator, PP helper and DeepL are exercised with that input.
 - Existing Phase 7A suite retains 20 toggles, shortcut/native-event routing, selection
   guard, real CaptureCoordinator Escape restore, interactive Settings and cleanup checks.
 
-New real desktop Region -> Start -> live PP-OCRv6 -> live DeepL while editing appearance
-is pending because input capture is invalid. Native foreground Ctrl+Alt+T/R/S and true
-cross-process mouse delivery were not newly accepted in this run. Historical owner 7A
-PASS remains distinct from this phase's automated routing/replay evidence.
+The owner subsequently confirmed live OCR and DeepL continue after appearance changes,
+and Ctrl+Alt+T/R/S have no regression: **live appearance regression PASS**. These are
+real-desktop owner results, separate from the agent's replay tests and historical
+inconclusive capture attempt. No new agent-run foreground-input test is claimed.
 
 ## Build and Tests
 
@@ -193,7 +233,18 @@ CMake automatically reconfigured the existing Release/Debug Ninja trees. Missing
 optional Vulkan headers do not affect this Widgets build. Final checks: Release
 15/15, **11.24 s**; Debug 15/15, **11.52 s**; `git diff --check` PASS.
 
-## Remaining Manual Procedure
+For this documentation-only acceptance follow-up, existing Release/Debug executable
+outputs and CMake build types were checked. Each latest complete LastTest.log contains
+15 passed tests and zero failed tests (Release 2026-10-06 17:17, Debug 17:18, local time).
+No build or CTest rerun was needed; no production source changed. An older
+LastTestsFailed.log from an intermediate failed run is not the latest full-suite result.
+
+## Repeatable Manual Procedure
+
+Core manual checks are accepted above. This procedure is retained for future regression
+testing, not as a list of current core blockers. Actual DPI / multi-monitor checks
+remain pending. Additional restart/Cancel/probe details are not newly claimed as manual
+PASS; existing automated coverage remains the evidence for them.
 
 1. Unlock the desktop and ensure normal screen capture works. Run from the project:
    `build/phase61b/TranslatorCaptureExclusionProbe.exe .cache/phase7b1/manual --observe`.
@@ -213,7 +264,7 @@ optional Vulkan headers do not affect this Widgets build. Final checks: Release
 
 ## 53-Point Delivery Ledger
 
-1. Implementation complete; full native/manual capture acceptance not complete.
+1. Core acceptance PASS; remaining environment-specific checks: DPI / multi-monitor.
 2. Initial commit: `8465098f5b8932181d1d4f83504be33887c2e535`.
 3. Modified: CMakeLists.txt, README.md, SettingsManager.*, SettingsDialog.*, TranslationWindow.*,
    tests/PaddleIntegrationProbe.cpp.
@@ -222,18 +273,18 @@ optional Vulkan headers do not affect this Widgets build. Final checks: Release
 5. Capture architecture: small injectable platform boundary owned by TranslationWindow.
 6. Windows API: SetWindowDisplayAffinity; RtlGetVersion for support detection.
 7. Actual WDA_EXCLUDEFROMCAPTURE calls/readback succeeded.
-8. Current Windows supports the API; actual capture effect not accepted.
+8. API support verified; actual Windows capture ON/OFF behavior manually accepted by owner.
 9. Native recreation not observed in 20 switches; fake/new-handle path tested.
 10. Reapply on show, WinIdChange, preference and interaction-mode changes.
 11. Default ON on Windows; OFF/unsupported on other platforms.
 12. Capture preference persistence/new-window ON/OFF tested.
-13. ON production screenshots all black; not valid exclusion evidence.
-14. OFF screenshots also all black; no positive overlay control.
-15. Interactive capture acceptance not verified.
-16. ClickThrough capture acceptance not verified.
-17. 20-switch API readback PASS; screen-image acceptance not verified.
-18. Overlay self-capture cannot be determined in this environment.
-19. All-black baseline blocks attribution; keep overlay-over-region limitation.
+13. ON manual PASS: Windows screenshots exclude overlay; historical agent images stay inconclusive.
+14. OFF manual PASS: Windows screenshots include overlay; historical agent images stay inconclusive.
+15. Interactive + exclusion manual PASS (owner-reported).
+16. ClickThrough + exclusion manual PASS (owner-reported).
+17. Historical 20-switch API readback PASS; no new manual switch count or probe-image PASS inferred.
+18. Owner reports no obvious self-capture / OCR feedback with overlay covering Region.
+19. Best-effort behavior remains OS/capture API dependent; no universal feedback fix claimed.
 20. Translation font: independent 10-72 pt, original default formula retained.
 21. Original font: independent 10-72 pt, original default formula retained.
 22. Background opacity: 0-100%, container alpha only, default transparent.
@@ -243,12 +294,12 @@ optional Vulkan headers do not affect this Widgets build. Final checks: Release
 26. Last enabled UI checkbox protected; storage double-false restores Translation.
 27. Apply/OK persist immediately; Cancel discards unapplied overlay drafts.
 28. New SettingsManager/TranslationWindow restores appearance and affinity preferences.
-29. Real Paddle batch/replay and running controlled-coordinator regression PASS; new live capture pending.
-30. Real DeepL smoke and 4/4 replay translations PASS; live desktop translation pending.
-31. Ctrl+Alt+T routing/20 mode switches automated PASS; previous owner foreground PASS retained.
-32. Ctrl+Alt+R routing/selection-guard tests PASS; new foreground manual pending.
-33. Ctrl+Alt+S routing tests PASS; new foreground manual pending.
-34. Existing Region logic/Escape restoration tests PASS; new desktop selection pending.
+29. Real Paddle batch/replay PASS; live OCR after appearance changes manual PASS (owner-reported).
+30. DeepL smoke/replay PASS; live translation after appearance changes manual PASS (owner-reported).
+31. Ctrl+Alt+T automated routing and owner-reported no-regression PASS.
+32. Ctrl+Alt+R automated routing and owner-reported no-regression PASS.
+33. Ctrl+Alt+S automated routing and owner-reported no-regression PASS.
+34. Region logic/Escape automated PASS; owner-reported overlay-over-Region and R no-regression PASS.
 35. Geometry preserved in mode/appearance tests; no forced default relocation on style Apply.
 36. Qt logical points/geometry; no DPR multiplication. Real 100%/150%/multi-monitor pending.
 37. Release build PASS.
@@ -262,11 +313,11 @@ optional Vulkan headers do not affect this Widgets build. Final checks: Release
 45. README updated with settings and precise acceptance status.
 46. This report contains architecture, evidence, limitations and manual steps.
 47. Intended final Git state: main synchronized; only the two pre-existing untracked license items.
-48. Implementation commit hash is supplied in the final response (no self-referential commit hash).
-49. Ordinary origin/main push required; final result supplied in the response.
+48. Implementation commit: `02c63bded97d1bd911155cc2a81277b3262a9880`; doc follow-up hash in final response.
+49. Implementation pushed to origin/main; doc follow-up push result supplied in the response.
 50. LunaTranslator working tree clean and untouched.
 51. Phase 7B.2 not started.
-52. Remaining: valid native capture ON/OFF, new live desktop/foreground checks, DPI/multi-monitor,
-   known no-subtitle false positives; public license gate not touched.
-53. Phase 7B.2 candidates only: first close valid capture/manual evidence gaps; later consider
-   additional overlay UX only under a separate request. No further feature started here.
+52. Remaining environment-specific checks: DPI / multi-monitor. Historical agent probe remains
+   inconclusive; known no-subtitle false positives and public license gate are unchanged.
+53. Phase 7B.2 candidates only: later overlay UX under a separate request; repeat environment-specific
+   checks when available. No further feature started here.
