@@ -12,6 +12,20 @@ set(CMAKE_AUTORCC ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network)
 
+# Independent foundation: no audio acquisition is wired into the overlay application.
+find_package(Qt6 REQUIRED COMPONENTS Multimedia)
+add_library(TranslatorAudio STATIC
+    src/audio/AudioInputTypes.h src/audio/IAudioInput.h
+    src/audio/PcmConverter.h src/audio/PcmConverter.cpp
+    src/audio/AudioInputCoordinator.h src/audio/AudioInputCoordinator.cpp
+    src/audio/MicrophoneAudioInput.h src/audio/MicrophoneAudioInput.cpp
+    src/audio/WindowsLoopbackAudioInput.h src/audio/WindowsLoopbackAudioInput.cpp)
+target_include_directories(TranslatorAudio PUBLIC src)
+target_link_libraries(TranslatorAudio PUBLIC Qt6::Core Qt6::Multimedia)
+if(WIN32)
+    target_link_libraries(TranslatorAudio PRIVATE ole32 uuid)
+endif()
+
 add_library(TranslatorOverlayPlatform STATIC
     src/platform/WindowCaptureExclusion.h src/platform/WindowCaptureExclusion.cpp)
 target_include_directories(TranslatorOverlayPlatform PUBLIC src)
@@ -116,6 +130,18 @@ set_target_properties(Translator PROPERTIES
 include(CTest)
 
 if(BUILD_TESTING)
+    add_executable(TranslatorAudioConverterTests tests/AudioConverterTest.cpp)
+    target_link_libraries(TranslatorAudioConverterTests PRIVATE TranslatorAudio)
+    add_test(NAME phase8a_pcm_converter COMMAND TranslatorAudioConverterTests)
+    add_executable(TranslatorAudioCoordinatorTests tests/AudioCoordinatorTest.cpp)
+    target_link_libraries(TranslatorAudioCoordinatorTests PRIVATE TranslatorAudio)
+    add_test(NAME phase8a_audio_coordinator COMMAND TranslatorAudioCoordinatorTests)
+    add_executable(TranslatorAudioBackendTests tests/AudioBackendTest.cpp)
+    target_link_libraries(TranslatorAudioBackendTests PRIVATE TranslatorAudio)
+    add_test(NAME phase8a_backend_failure_cleanup COMMAND TranslatorAudioBackendTests)
+    set_tests_properties(phase8a_backend_failure_cleanup PROPERTIES TIMEOUT 15)
+    add_executable(TranslatorAudioCaptureProbe tests/AudioCaptureProbe.cpp)
+    target_link_libraries(TranslatorAudioCaptureProbe PRIVATE TranslatorAudio)
     add_executable(TranslatorPhase7ControlsTests tests/Phase7OverlayControlsTest.cpp
         ${OVERLAY_INTERACTION_SOURCES}
         src/config/SettingsManager.cpp src/config/SettingsManager.h

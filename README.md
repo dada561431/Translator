@@ -2,6 +2,19 @@
 
 `Translator` 是一个基于 Qt 6、C++17 和 Qt Widgets 的实时屏幕文字识别与翻译程序。本项目参考 LunaTranslator 的架构和功能设计，但采用独立的 Qt 6/C++ 实现；原 LunaTranslator 源码保持独立且不受本工程影响。
 
+## Phase 8A Audio Input Foundation
+
+Independent audio module and local QA Probe: Qt microphone capture and Windows
+WASAPI system-output loopback, unified 16 kHz mono int16 LE PCM, 20 ms chunks,
+explicit Start/Stop, bounded delivery and session-safe cleanup. No automatic
+capture on application startup, no ASR, no OCR/translation/subtitle integration.
+Acceptance is tracked separately for microphone and loopback; see
+[Phase 8A architecture and evidence](docs/audio-input-phase8a.md).
+Current Phase 8A status: **PARTIAL**. System Loopback Capture PASS; full microphone
+voice/quiet acceptance PENDING despite successful PCM capture and lifecycle checks.
+Release/Debug and **19/19 CTest suites** PASS; both backends passed five-minute
+stability and 20-cycle Start/Stop probes. Physical device-change checks remain pending.
+
 ## Phase 7B.2 Overlay Controls
 
 Overlay position lock disables mouse dragging/resizing independently of

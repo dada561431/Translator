@@ -55,3 +55,7 @@ dist/
 *.zip
 benchmarks/ocr_false_positive/private/
 benchmarks/ocr_false_positive/results/
+
+# Private audio QA data (Phase 8A does not record audio by default)
+*.wav
+*.pcm
