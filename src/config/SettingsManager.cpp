@@ -133,6 +133,17 @@ QByteArray SettingsManager::windowGeometry() const
     return settings_.value(kWindowGeometryKey).toByteArray();
 }
 
+bool SettingsManager::overlayClickThrough() const
+{
+    return settings_.value(QStringLiteral("overlay/clickThrough"), false).toBool();
+}
+
+void SettingsManager::setOverlayClickThrough(bool enabled)
+{
+    settings_.setValue(QStringLiteral("overlay/clickThrough"), enabled);
+    settings_.sync();
+}
+
 QRect SettingsManager::captureRegion() const
 {
     const QRect region = settings_.value(kCaptureRegionKey).toRect();

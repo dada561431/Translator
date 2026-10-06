@@ -2,6 +2,23 @@
 
 `Translator` 是一个基于 Qt 6、C++17 和 Qt Widgets 的实时屏幕文字识别与翻译程序。本项目参考 LunaTranslator 的架构和功能设计，但采用独立的 Qt 6/C++ 实现；原 LunaTranslator 源码保持独立且不受本工程影响。
 
+## Phase 7A Overlay Interaction
+
+Windows defaults: **Ctrl+Alt+T** toggles mouse passthrough / Interactive;
+**Ctrl+Alt+R** selects Region; **Ctrl+Alt+S** toggles realtime Start/Stop.
+First run is Interactive. Passthrough hides the toolbar; T restores controls
+before dragging, resizing, opening Settings or closing. The last mode is saved;
+failed T registration forces a safe Interactive startup without deleting that
+preference. Start/Stop is independent of interaction mode. Shortcuts are ignored
+during Region selection and its capture delay, preserving the entry mode.
+
+Implementation and automated tests are available, but **native Windows manual
+acceptance is pending**: actual click delivery to the lower program and shortcuts
+with another foreground application have not yet been verified in this run.
+See [Phase 7A report and manual checks](docs/overlay-interaction-phase7a.md).
+Mouse passthrough does not exclude the overlay from screenshots. Phase 7B and
+public redistribution/licensing work remain deferred; no new portable package.
+
 ## Phase 6.1C Portable Build Infrastructure
 
 **Technical portable acceptance: PASS. Clean Windows acceptance: PASS.

@@ -15,6 +15,7 @@ class CaptureCoordinator final : public QObject
 public:
     CaptureCoordinator(TranslationWindow &window, SettingsManager &settings,
                        QObject *parent = nullptr);
+    bool isSelecting() const { return selecting_; }
 
 signals:
     void selectionStarted();

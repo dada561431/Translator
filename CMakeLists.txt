@@ -12,6 +12,11 @@ set(CMAKE_AUTORCC ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network)
 
+set(OVERLAY_INTERACTION_SOURCES
+    src/app/GlobalShortcutManager.h src/app/GlobalShortcutManager.cpp
+    src/app/OverlayInteractionController.h src/app/OverlayInteractionController.cpp
+)
+
 set(REALTIME_SOURCES
     src/app/RealtimePipelineCoordinator.h src/app/RealtimePipelineCoordinator.cpp
     src/processing/FrameComparator.h src/processing/FrameComparator.cpp
@@ -52,6 +57,7 @@ if(WIN32)
 endif()
 
 add_executable(Translator
+    ${OVERLAY_INTERACTION_SOURCES}
     ${PADDLE_OCR_SOURCES}
     src/ocr/OcrEngineFactory.h src/ocr/OcrEngineFactory.cpp
     ${REALTIME_SOURCES}
@@ -89,6 +95,9 @@ target_link_libraries(Translator PRIVATE
     Qt6::Widgets
     Qt6::Network
 )
+if(WIN32)
+    target_link_libraries(Translator PRIVATE user32)
+endif()
 
 set_target_properties(Translator PROPERTIES
     WIN32_EXECUTABLE TRUE
@@ -97,6 +106,22 @@ set_target_properties(Translator PROPERTIES
 include(CTest)
 
 if(BUILD_TESTING)
+    add_executable(TranslatorPhase7Tests
+        tests/Phase7OverlayTest.cpp ${OVERLAY_INTERACTION_SOURCES}
+        src/config/SettingsManager.cpp src/config/SettingsManager.h
+        src/gui/SettingsDialog.cpp src/gui/SettingsDialog.h
+        src/gui/TranslationWindow.cpp src/gui/TranslationWindow.h
+        src/app/CaptureCoordinator.cpp src/app/CaptureCoordinator.h
+        src/capture/RegionSelector.cpp src/capture/RegionSelector.h
+        src/capture/ScreenCaptureService.cpp src/capture/ScreenCaptureService.h
+    )
+    target_include_directories(TranslatorPhase7Tests PRIVATE src)
+    target_link_libraries(TranslatorPhase7Tests PRIVATE TranslatorProviders Qt6::Gui Qt6::Widgets)
+    if(WIN32)
+        target_link_libraries(TranslatorPhase7Tests PRIVATE user32)
+    endif()
+    add_test(NAME phase7a_overlay_interaction COMMAND TranslatorPhase7Tests)
+    set_tests_properties(phase7a_overlay_interaction PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
     add_executable(TranslatorRuntimeLocatorTests tests/RuntimeLocatorTest.cpp ${PADDLE_OCR_SOURCES})
     target_include_directories(TranslatorRuntimeLocatorTests PRIVATE src)
     target_link_libraries(TranslatorRuntimeLocatorTests PRIVATE Qt6::Core Qt6::Gui)

@@ -13,6 +13,8 @@
 #include "app/TranslationCoordinator.h"
 #include "app/RealtimePipelineCoordinator.h"
 #include "app/RuntimeSelfCheck.h"
+#include "app/GlobalShortcutManager.h"
+#include "app/OverlayInteractionController.h"
 #include "config/SettingsManager.h"
 #include "gui/TranslationWindow.h"
 #include "ocr/OcrEngineFactory.h"
@@ -81,6 +83,17 @@ int main(int argc, char *argv[])
     QObject::connect(&captureCoordinator, &CaptureCoordinator::captureCompleted,
                      &realtime, &RealtimePipelineCoordinator::acceptOneShot);
     translationWindow.show();
+    GlobalShortcutManager shortcuts;
+    OverlayInteractionController overlayInteraction(translationWindow, settings, shortcuts, {
+        [&] { return captureCoordinator.isSelecting(); },
+        [&] { emit translationWindow.regionSelectionRequested(); },
+        [&] { return realtime.isRunning(); },
+        [&] { realtime.start(); },
+        [&] { realtime.stop(); }
+    });
+    QObject::connect(&application, &QCoreApplication::aboutToQuit, &shortcuts,
+                     &GlobalShortcutManager::unregisterAll);
+    overlayInteraction.initialize();
 
     return application.exec();
 }

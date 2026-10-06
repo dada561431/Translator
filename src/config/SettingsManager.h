@@ -22,6 +22,7 @@ public:
     QString openAiBaseUrl() const;
     QString openAiModel() const;
     QByteArray windowGeometry() const;
+    bool overlayClickThrough() const;
     QRect captureRegion() const;
     QString captureScreen() const;
 
@@ -34,6 +35,7 @@ public:
     void setOpenAiModel(const QString &model);
     void notifyCredentialsChanged();
     void setWindowGeometry(const QByteArray &geometry);
+    void setOverlayClickThrough(bool enabled);
     void setCaptureRegion(const QRect &region, const QString &screenName);
 
 signals:

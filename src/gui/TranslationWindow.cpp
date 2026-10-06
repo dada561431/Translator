@@ -46,6 +46,7 @@ TranslationWindow::TranslationWindow(SettingsManager &settings, QWidget *parent,
     setObjectName(QStringLiteral("translationWindow"));
     setWindowTitle(QStringLiteral("Translator"));
     setAttribute(Qt::WA_TranslucentBackground);
+    setAttribute(Qt::WA_ShowWithoutActivating);
     setMouseTracking(true);
     setMinimumSize(420, 120);
 
@@ -57,6 +58,39 @@ TranslationWindow::TranslationWindow(SettingsManager &settings, QWidget *parent,
 
     settingsDialog_ = new SettingsDialog(settings_, this, credentials);
     restoreWindowGeometry();
+}
+
+void TranslationWindow::setInteractionMode(OverlayInteractionMode mode)
+{
+    if (interactionMode_ == mode) return;
+    const QRect previousGeometry = geometry();
+    const bool wasVisible = isVisible();
+    const bool settingsVisible = settingsDialog_ && settingsDialog_->isVisible();
+    QScreen *previousScreen = screen();
+    interactionMode_ = mode;
+    toolbarHideTimer_->stop();
+    unsetCursor();
+    const bool clickThrough = mode == OverlayInteractionMode::ClickThrough;
+    Qt::WindowFlags flags = windowFlags();
+    flags.setFlag(Qt::WindowTransparentForInput, clickThrough);
+    flags.setFlag(Qt::WindowDoesNotAcceptFocus, clickThrough);
+    // QWidget flag changes hide the window and may recreate its native handle.
+    setWindowFlags(flags);
+    if (windowHandle() && previousScreen) windowHandle()->setScreen(previousScreen);
+    setGeometry(previousGeometry);
+    toolbar_->setVisible(!clickThrough);
+    if (wasVisible) show();
+    if (settingsVisible) settingsDialog_->show();
+    if (!clickThrough) {
+        toolbarHideTimer_->start(1000);
+    }
+    interactionFeedback_->setText(clickThrough ? tr("Mouse passthrough ON") : tr("Interactive mode"));
+    interactionFeedback_->adjustSize();
+    interactionFeedback_->move((width() - interactionFeedback_->width()) / 2,
+                               toolbar_->geometry().bottom() + 4);
+    interactionFeedback_->show();
+    interactionFeedback_->raise();
+    interactionFeedbackTimer_->start();
 }
 
 void TranslationWindow::setTranslatedText(const QString &text)
@@ -103,6 +137,8 @@ void TranslationWindow::setTranslationState(TranslationState state)
 
 bool TranslationWindow::eventFilter(QObject *watched, QEvent *event)
 {
+    if (interactionMode_ == OverlayInteractionMode::ClickThrough)
+        return QWidget::eventFilter(watched, event);
     const auto *watchedWidget = qobject_cast<QWidget *>(watched);
     const bool isHoverWidget = watchedWidget
         && (watchedWidget == subtitleArea_ || watchedWidget == toolbar_
@@ -145,8 +181,10 @@ bool TranslationWindow::eventFilter(QObject *watched, QEvent *event)
 
 void TranslationWindow::enterEvent(QEnterEvent *event)
 {
-    toolbarHideTimer_->stop();
-    toolbar_->show();
+    if (interactionMode_ == OverlayInteractionMode::Interactive) {
+        toolbarHideTimer_->stop();
+        toolbar_->show();
+    }
     QWidget::enterEvent(event);
 }
 
@@ -162,6 +200,11 @@ void TranslationWindow::resizeEvent(QResizeEvent *event)
     const int toolbarWidth = qMax(0, width() - 16);
     toolbar_->setGeometry(8, 6, toolbarWidth, toolbar_->sizeHint().height());
     toolbar_->raise();
+    if (interactionFeedback_) {
+        interactionFeedback_->move((width() - interactionFeedback_->width()) / 2,
+                                   toolbar_->geometry().bottom() + 4);
+        interactionFeedback_->raise();
+    }
 }
 
 void TranslationWindow::closeEvent(QCloseEvent *event)
@@ -263,6 +306,13 @@ void TranslationWindow::createUi()
     subtitleLayout->addStretch();
     layout->addWidget(subtitleArea_, 1);
 
+    interactionFeedback_ = new QLabel(this);
+    interactionFeedback_->setObjectName(QStringLiteral("interactionFeedback"));
+    interactionFeedback_->setTextFormat(Qt::PlainText);
+    interactionFeedback_->setAttribute(Qt::WA_TransparentForMouseEvents);
+    interactionFeedback_->setStyleSheet(QStringLiteral("color: white; background: rgba(28,30,33,210); padding: 3px 8px;"));
+    interactionFeedback_->hide();
+
     setStyleSheet(QStringLiteral(R"(
         #translationWindow, #subtitleArea {
             background: transparent;
@@ -314,7 +364,8 @@ void TranslationWindow::connectControls()
     toolbarHideTimer_->setSingleShot(true);
     toolbarHideTimer_->setInterval(400);
     connect(toolbarHideTimer_, &QTimer::timeout, this, [this] {
-        if (!rect().contains(mapFromGlobal(QCursor::pos()))) {
+        if (interactionMode_ == OverlayInteractionMode::ClickThrough
+            || !rect().contains(mapFromGlobal(QCursor::pos()))) {
             toolbar_->hide();
         }
     });
@@ -323,6 +374,10 @@ void TranslationWindow::connectControls()
     statusClearTimer_->setSingleShot(true);
     statusClearTimer_->setInterval(3000);
     connect(statusClearTimer_, &QTimer::timeout, statusLabel_, &QWidget::hide);
+    interactionFeedbackTimer_ = new QTimer(this);
+    interactionFeedbackTimer_->setSingleShot(true);
+    interactionFeedbackTimer_->setInterval(1000);
+    connect(interactionFeedbackTimer_, &QTimer::timeout, interactionFeedback_, &QWidget::hide);
 
     connect(regionButton_, &QPushButton::clicked,
             this, &TranslationWindow::regionSelectionRequested);
@@ -352,7 +407,7 @@ void TranslationWindow::showToolbarStatus(const QString &message)
 
 void TranslationWindow::scheduleToolbarHide()
 {
-    toolbarHideTimer_->start();
+    if (interactionMode_ == OverlayInteractionMode::Interactive) toolbarHideTimer_->start(400);
 }
 
 Qt::Edges TranslationWindow::resizeEdgesAt(const QPoint &position) const

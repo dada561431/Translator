@@ -15,6 +15,8 @@ class SettingsDialog;
 class SettingsManager;
 class ICredentialStore;
 
+enum class OverlayInteractionMode { Interactive, ClickThrough };
+
 class TranslationWindow final : public QWidget
 {
     Q_OBJECT
@@ -28,6 +30,8 @@ public:
     void setRegionFeedback(const QString &message);
     void setTranslationState(TranslationState state);
     void setTranslationRunning(bool running);
+    void setInteractionMode(OverlayInteractionMode mode);
+    OverlayInteractionMode interactionMode() const { return interactionMode_; }
 
 signals:
     void regionSelectionRequested();
@@ -62,9 +66,12 @@ private:
     QLabel *translatedLabel_ = nullptr;
     QLabel *originalLabel_ = nullptr;
     QLabel *statusLabel_ = nullptr;
+    QLabel *interactionFeedback_ = nullptr;
+    QTimer *interactionFeedbackTimer_ = nullptr;
     QTimer *toolbarHideTimer_ = nullptr;
     QTimer *statusClearTimer_ = nullptr;
     SettingsDialog *settingsDialog_ = nullptr;
     bool translatedPlaceholder_ = true;
     bool originalPlaceholder_ = true;
+    OverlayInteractionMode interactionMode_ = OverlayInteractionMode::Interactive;
 };
