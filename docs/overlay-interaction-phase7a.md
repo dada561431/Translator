@@ -3,8 +3,13 @@
 ## Status and Scope
 
 Baseline: `453782e662f354b791c2fda248db896ab3ed24f0`.
-Implementation and automated regression are complete; **Phase 7A final Windows
-manual acceptance is PENDING, not PASS**. The Computer Use service stopped before
+Implementation commit: `5940153387e4427e3ee1234f8505af81cb715cb6`.
+**Core acceptance PASS. Remaining environment-specific checks: DPI / multi-monitor.**
+The owner subsequently supplied the real Windows manual results recorded below;
+these are owner-reported evidence, not a new agent-run desktop test. This follow-up
+changes only this document and README, not production code.
+
+Historical agent-run attempt: the Computer Use service stopped before
 the browser test because it could not determine the browser URL with enough
 confidence to enforce its policy. No subsequent desktop input was attempted.
 Notepad launch also did not expose a targetable window. Neither outcome is proof
@@ -27,8 +32,9 @@ registered the recovery hotkey and applied the saved preference safely.
 ClickThrough uses Qt's `WindowTransparentForInput` and
 `WindowDoesNotAcceptFocus`, not a Win32 style fallback. Translucency, frameless and
 always-on-top flags remain unchanged. `WA_ShowWithoutActivating` avoids intentional
-focus activation on show/restore. Windows input delivery and foreground retention
-still require the manual checks below; no claim of verified cross-process delivery.
+focus activation on show/restore. Real cross-process mouse delivery and global
+switching with another application focused passed the owner's manual tests below.
+The owner did not separately report native foreground-handle measurements.
 
 Qt flag changes can hide/recreate the native window. Mode switching snapshots
 logical geometry, current screen, visibility and Settings visibility, reapplies
@@ -96,6 +102,12 @@ Existing 13 suites remain; total **14**. Release build **PASS**, Release CTest
 **14/14 PASS** (12.55 seconds); Debug build **PASS**, Debug CTest **14/14 PASS**
 (17.14 seconds). Automated routing is not a live Paddle/DeepL passthrough test.
 
+Documentation-only manual-acceptance follow-up at implementation HEAD `5940153`:
+both Release and Debug build checks succeeded with `ninja: no work to do`.
+CTest was rerun with `--output-on-failure`: Release **14/14 PASS** (11.80 seconds),
+Debug **14/14 PASS** (11.22 seconds). No source or test change was needed, and these
+regressions do not replace the separately attributed owner desktop evidence.
+
 Commands used (Qt/MinGW bin directories were prepended to this shell's PATH,
 not embedded in CMake):
 
@@ -114,9 +126,34 @@ dialog without Q_OBJECT); tests now use Escape event dispatch and QDialog lookup
 Both final builds/tests above passed after these repairs. Optional Vulkan headers
 were not found; no Vulkan dependency is introduced or required by this change.
 
-## Windows Manual Acceptance - Pending
+## Windows Manual Acceptance - Core PASS
 
-Do not mark this phase fully accepted until these are observed on the real desktop:
+The owner confirmed the following on a real Windows desktop after the implementation
+commit. No exact Windows build, lower-application identity, provider identity or
+additional latency figures were supplied; none is inferred.
+
+| Check | Owner-reported result |
+|---|---|
+| Ctrl+Alt+T while another application has focus | PASS: globally switches Interactive / ClickThrough |
+| Real mouse passthrough | PASS: lower application receives clicks through Translator |
+| ClickThrough toolbar | PASS: hidden |
+| Interactive restore | PASS: T restores clickable controls, dragging and operation |
+| Ctrl+Alt+R while another application is foreground | PASS: triggers Region |
+| Ctrl+Alt+S while another application is foreground | PASS: Start / Stop |
+| Live PP-OCRv6 Small while ClickThrough | PASS: OCR subtitles continue updating |
+| Live translation while ClickThrough | PASS: translated subtitles continue updating with translation enabled |
+| Realtime independence | PASS: passthrough does not stop the realtime pipeline |
+| Windows DPI 100% / 150% | PENDING / NOT TESTED in this round |
+| Multiple monitors | NOT TESTED |
+
+There is no new core blocker. **Core acceptance PASS** does not claim PASS for DPI
+or multi-monitor, nor invent separate manual results for resize, Settings, native
+20-toggle geometry, Region cancellation, registration-conflict or exit-cleanup
+subchecks not explicitly included in the owner's report. Existing automated
+regressions for these behaviors remain separate evidence.
+
+The original comprehensive manual procedure is retained for reproducibility and
+optional follow-up; it is not a claim that every substep below was reported:
 
 1. Start Translator (first-run Interactive), put it over a Notepad/browser work area;
    verify toolbar, drag, edge resize, Settings and Close.
@@ -135,9 +172,10 @@ Do not mark this phase fully accepted until these are observed on the real deskt
    saved clickThrough=true, confirm safe Interactive fallback; release the fixture.
 7. Test 100% and 150% Windows scaling and a secondary monitor if available.
 
-Actual T/R/S system registration, foreground hotkeys, lower-program mouse receipt,
-native drag/resize, Region success, real OCR/translation while passthrough, native
-20-switch geometry, DPI and secondary-monitor checks are **not yet verified**.
+T/R/S functionality, foreground shortcuts, lower-program mouse receipt, Interactive
+restore/dragging and live OCR/translation while passthrough are now **PASS** on
+owner-reported evidence. Native 20-switch geometry and other separately instrumented
+subchecks were not reported. DPI and secondary-monitor checks remain unverified.
 No GUI screenshots or credentials are committed. No security settings changed.
 
 ## Limitations and Phase 7B Candidates
@@ -153,7 +191,7 @@ No Installer, audio/ASR, packaging regeneration or public ZIP.
 
 | # | Item | Result |
 |---|---|---|
-| 1 | Fully complete | No: native Windows manual acceptance pending |
+| 1 | Acceptance status | Core acceptance PASS; remaining environment-specific checks: DPI / multi-monitor |
 | 2 | Initial commit | 453782e662f354b791c2fda248db896ab3ed24f0 |
 | 3 | Modified files | CMakeLists.txt, README.md, src/main.cpp, src/app/CaptureCoordinator.h, src/config/SettingsManager.h/.cpp, src/gui/TranslationWindow.h/.cpp |
 | 4 | New files | src/app/GlobalShortcutManager.h/.cpp, src/app/OverlayInteractionController.h/.cpp, tests/Phase7OverlayTest.cpp, this document |
@@ -161,25 +199,25 @@ No Installer, audio/ASR, packaging regeneration or public ZIP.
 | 6 | Passthrough | Qt window flags; Win32 only for global shortcut registration |
 | 7 | HWND recreation | Possible on Qt flag changes; not measured natively |
 | 8 | Geometry | Snapshot/restore logical rectangle, screen and visibility |
-| 9 | Topmost | Flag retained in automated tests; native pending |
-| 10 | T registration | Fake backend PASS; actual Windows registration pending |
-| 11 | R registration | Fake backend PASS; actual Windows registration pending |
-| 12 | S registration | Fake backend PASS; actual Windows registration pending |
+| 9 | Topmost | Flag retained in automated tests; separate native measurement not reported |
+| 10 | T registration | Owner reports functioning global T PASS; no separate registration log supplied |
+| 11 | R registration | Owner reports functioning global R PASS; no separate registration log supplied |
+| 12 | S registration | Owner reports functioning global S PASS; no separate registration log supplied |
 | 13 | Registration failure | Diagnostic, no crash, unregistered IDs ignored |
 | 14 | Startup safety | Failed T forces Interactive without deleting true preference |
-| 15 | Foreign foreground hotkeys | PENDING: Computer Use stopped before test |
-| 16 | Lower-program mouse receipt | PENDING: not tested, not declared PASS |
-| 17 | Toolbar | Offscreen hide/hover/timer checks PASS |
-| 18 | Drag | Existing Interactive system-move path retained; native pending |
-| 19 | Resize | Existing Interactive system-resize path retained; native pending |
-| 20 | Settings | Offscreen visibility/nontransparent flag checks PASS; native pending |
-| 21 | Region success | Existing path and mode guards retained; native success pending |
-| 22 | Region cancel | Real coordinator + dispatched Escape offscreen PASS; native pending |
-| 23 | Live pipeline + passthrough | PENDING, not replaced by fake routing tests |
-| 24 | OCR updates | UI updates in ClickThrough PASS; live Paddle while passthrough pending |
-| 25 | Translation updates | UI updates in ClickThrough PASS; live provider while passthrough pending |
-| 26 | Stop/Start | Routing checks and existing realtime/helper suites PASS; live pending |
-| 27 | 20 toggles | Offscreen geometry/content/visibility/flag checks PASS; native pending |
+| 15 | Foreign foreground hotkeys | PASS: owner manually verified T/R/S with another application focused |
+| 16 | Lower-program mouse receipt | PASS: owner observed actual clicks delivered to lower application |
+| 17 | Toolbar | Automated checks PASS; owner confirms hidden while ClickThrough |
+| 18 | Drag / Interactive restore | PASS: owner reports restored click/drag/operation |
+| 19 | Resize | Existing Interactive system-resize path retained; separate manual result not reported |
+| 20 | Settings | Offscreen visibility/nontransparent checks PASS; separate manual result not reported |
+| 21 | Region | PASS: owner reports global R triggers Region; completion-mode subcheck not separately reported |
+| 22 | Region cancel | Real coordinator + dispatched Escape offscreen PASS; separate native result not reported |
+| 23 | Live pipeline + passthrough | PASS: owner confirms realtime continues |
+| 24 | OCR updates | PASS: owner verified live PP-OCRv6 Small updates while ClickThrough |
+| 25 | Translation updates | PASS: owner verified enabled translation updates while ClickThrough |
+| 26 | Stop/Start | Automated regression PASS; owner reports foreground global S Start/Stop PASS |
+| 27 | 20 toggles | Offscreen geometry/content/visibility/flag checks PASS; native count not reported |
 | 28 | DPI | 100%/150% Windows native checks pending; no DPR arithmetic added |
 | 29 | Multiple monitors | Not tested; existing screen preserved in switching implementation |
 | 30 | Release | Build PASS |
@@ -189,15 +227,15 @@ No Installer, audio/ASR, packaging regeneration or public ZIP.
 | 34 | Paddle helper | Zero changes |
 | 35 | Phase 6.1C packaging | Zero changes in this phase; prior untracked licensing work excluded |
 | 36 | False positives | Known Limitation / Deferred unchanged |
-| 37 | Phase 7A document | This report, implementation and explicit pending manual checklist |
-| 38 | README | Shortcuts, safe startup and manual-acceptance caveat added |
-| 39 | Git scope | Only Phase 7A code/tests/docs staged; prior two untracked license paths preserved |
-| 40 | Commit | Implementation commit hash reported in final response, not a manual-acceptance claim |
+| 37 | Phase 7A document | Core PASS, attributed owner evidence and remaining environment-specific checks |
+| 38 | README | Core acceptance PASS synchronized; DPI / multi-monitor remain unverified |
+| 39 | Follow-up Git scope | Only this document and README; prior two untracked license paths preserved |
+| 40 | Commit | Implementation 5940153387e4427e3ee1234f8505af81cb715cb6; documentation follow-up hash reported separately |
 | 41 | Push | Result reported after ordinary origin/main push, never force push |
 | 42 | LunaTranslator | git status empty; readonly reference untouched |
 | 43 | Phase 7B | Not started |
-| 44 | Limits | Native acceptance pending; overlay may enter capture; false positives deferred |
-| 45 | Next candidates | Complete 7A manual gate first; later assess capture exclusion and UX customization |
+| 44 | Limits | DPI / multi-monitor untested; overlay may enter capture; false positives deferred |
+| 45 | Next candidates | Environment-specific checks; later capture exclusion and UX customization, not started |
 
 ## API References
 

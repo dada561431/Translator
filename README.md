@@ -12,9 +12,12 @@ failed T registration forces a safe Interactive startup without deleting that
 preference. Start/Stop is independent of interaction mode. Shortcuts are ignored
 during Region selection and its capture delay, preserving the entry mode.
 
-Implementation and automated tests are available, but **native Windows manual
-acceptance is pending**: actual click delivery to the lower program and shortcuts
-with another foreground application have not yet been verified in this run.
+**Core acceptance PASS. Remaining environment-specific checks: DPI / multi-monitor.**
+The owner manually verified real mouse passthrough, foreground global T/R/S,
+hidden toolbar, restored Interactive click/drag/operation, and continuing live
+PP-OCRv6 Small OCR and enabled translation while ClickThrough on a real Windows
+desktop. These are owner-reported results, not an agent-run desktop test.
+Windows 100%/150% DPI and multi-monitor remain pending / not tested.
 See [Phase 7A report and manual checks](docs/overlay-interaction-phase7a.md).
 Mouse passthrough does not exclude the overlay from screenshots. Phase 7B and
 public redistribution/licensing work remain deferred; no new portable package.
