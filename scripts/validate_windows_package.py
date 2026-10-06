@@ -90,6 +90,15 @@ def dependency_audit(root):
             "imports": records, "scope": "static candidate presence; dynamic loader and clean-machine acceptance required"}
 
 
+def validate_model_hashes(root, catalog=None):
+    if catalog is None:
+        catalog = json.loads(Path(__file__).with_name("runtime-models.json").read_text(encoding="utf-8"))
+    for entry in catalog["files"]:
+        model = relative_file(Path(root) / "ocr/models", entry["path"])
+        if model.stat().st_size != entry["bytes"] or digest(model) != entry["sha256"]:
+            raise ValueError("Model does not match the verified Phase 6.1A catalog")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("package", type=Path)
@@ -97,6 +106,7 @@ def main():
     parser.add_argument("--audit-output", type=Path)
     args = parser.parse_args()
     manifest = validate(args.package)
+    validate_model_hashes(args.package)
     if args.audit_output:
         report = dependency_audit(args.package)
         args.audit_output.parent.mkdir(parents=True, exist_ok=True)
@@ -107,7 +117,8 @@ def main():
         env = {k: v for k, v in os.environ.items() if k.upper() in {
             "WINDIR", "SYSTEMROOT", "LOCALAPPDATA", "APPDATA", "USERPROFILE", "TEMP", "TMP"}}
         env.update(PATH=str(Path(os.environ["WINDIR"]) / "System32"),
-                   PYTHONHOME="Z:/invalid", PYTHONPATH="Z:/invalid")
+                   PYTHONHOME="Z:/invalid", PYTHONPATH="Z:/invalid",
+                   QT_PLUGIN_PATH="Z:/invalid", QT_QPA_PLATFORM_PLUGIN_PATH="Z:/invalid")
         with tempfile.TemporaryDirectory(prefix="translator-validation-") as temp:
             report_path = Path(temp) / "self-check.json"
             result = subprocess.run([str(args.package.resolve() / "Translator.exe"), "--self-check", "--report", str(report_path)],

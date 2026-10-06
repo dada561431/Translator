@@ -1,129 +1,149 @@
 # Third-party Runtime License Inventory
 
-## Status
+## Release State
 
-This is the inventory of the local Phase 6.1C **draft**, not a redistribution clearance.
-The collector preserves wheel license/NOTICE files, the CPython license, MinGW
-runtime notices and the actual Qt source SBOM. Supplementary reviewed notices can
-be provided with `--license-root`. Wheel metadata alone does not resolve bundled
-native-library obligations. Source URLs below are upstream wheel metadata, not
-independent legal conclusions. No project license is selected by this task.
+**BLOCKED: redistribution clearance is not complete.** This is the 2026-10-06
+regenerated technical candidate's actual 78-component inventory, not approval.
+Collected licenses/NOTICE files and metadata do not replace owner/legal review.
+No project license, commercial Qt rights or VC redistribution eligibility is assumed.
 
-Qt acquisition and applicable commercial/open-source terms must be confirmed by
-the owner. Dynamic linking does not remove applicable source, replacement/relinking,
-license and third-party notice duties. Consult [Qt licensing](https://doc.qt.io/qt-6/licensing.html)
-and [Qt LGPL obligations](https://www.qt.io/development/open-source-lgpl-obligations).
-This technical inventory is not legal advice.
+Qt 6.11.2: **OWNER REVIEW REQUIRED**. The owner explicitly has not authorized
+assuming commercial rights. Applicable terms depend on acquisition and project
+license. Sources: [Qt licensing](https://doc.qt.io/qt-6/licensing.html) and
+[Qt LGPL obligations](https://www.qt.io/development/open-source-lgpl-obligations).
+Dynamic linking does not remove source/replacement/relinking and notice obligations.
+The actual qtbase source SBOM is collected, but is not a complete Qt license bundle;
+deployed QtSvg and plugin source/notice duties still need owner review.
 
-Microsoft app-local VC redistribution inputs must have approved provenance, hashes
-and license material. The current draft is missing `msvcp140.dll` and `vcomp140.dll`.
-Do not copy them from System32 and declare redistribution approved. See
-[Microsoft redistribution guidance](https://learn.microsoft.com/en-us/cpp/windows/redistributing-visual-cpp-files?view=msvc-170).
+Microsoft VC 14.51.36247.0: **OWNER REVIEW REQUIRED**. Official signed bytes establish
+provenance, not owner's permission. See [Microsoft redistribution guidance](https://learn.microsoft.com/en-us/cpp/windows/redistributing-visual-cpp-files?view=msvc-170),
+[latest supported redist](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170),
+[VS redistribution list](https://learn.microsoft.com/en-us/visualstudio/releases/2026/redistribution)
+and [license terms](https://visualstudio.microsoft.com/license-terms/vs2026-ga-visualcpp-v14-redist-runtime/).
+Four matching DLLs were extracted from the official signed x64 EXE as data,
+not copied from System32 or an installed developer runtime. Installer, DLL and
+license hashes are pinned in `scripts/vc-runtime.json`. Missing CRT gates now pass;
+legal release permission remains pending.
 
-## Distributed Components
+## Actual Shipped Matrix
 
-All rows below are actually present in the draft. Notice counts refer to the initial
-collector result; the revised collector also includes complete license directories
-(e.g. PDFium build-license text). Preserve copyrights and all component notices;
-check reciprocal/source requirements individually before public distribution.
+Notice paths below are relative to candidate `licenses/`. Source and license
+declarations are upstream metadata, not independent legal conclusions. Missing
+notice material is an explicit review blocker. Nothing is marked cleared.
 
-| Component | Version | Reported License | Distributed | Source URL | Notice / Review |
-|---|---|---|---|---|---|
-| aiohappyeyeballs | 2.7.1 | Python Software Foundation License | Yes, local draft | https://github.com/aio-libs/aiohappyeyeballs | 1 collected records; review bundled dependencies |
-| aiohttp | 3.14.3 | Apache-2.0 AND MIT | Yes, local draft | https://github.com/aio-libs/aiohttp | 2 collected records; review bundled dependencies |
-| aiosignal | 1.4.0 | Apache Software License | Yes, local draft | https://github.com/aio-libs/aiosignal | 1 collected records; review bundled dependencies |
-| aistudio_sdk | 0.3.9 | Apache Software License | Yes, local draft | Not declared in wheel | 1 collected records; review bundled dependencies |
-| annotated-types | 0.8.0 | MIT | Yes, local draft | https://github.com/annotated-types/annotated-types | 1 collected records; review bundled dependencies |
-| anyio | 4.15.1 | MIT | Yes, local draft | https://github.com/agronholm/anyio | 1 collected records; review bundled dependencies |
-| attrs | 26.1.0 | MIT | Yes, local draft | https://tidelift.com/subscription/pkg/pypi-attrs?utm_source=pypi-attrs&utm_medium=pypi | 1 collected records; review bundled dependencies |
-| bce-python-sdk | 0.9.79 | Apache License 2.0 | Yes, local draft | http://bce.baidu.com | 0 collected records; review bundled dependencies |
-| certifi | 2026.7.22 | Mozilla Public License 2.0 (MPL 2.0) | Yes, local draft | https://github.com/certifi/python-certifi | 1 collected records; review bundled dependencies |
-| cffi | 2.1.1 | MIT-0 | Yes, local draft | https://github.com/python-cffi/cffi | 1 collected records; review bundled dependencies |
-| chardet | 7.6.0 | 0BSD | Yes, local draft | https://github.com/chardet/chardet | 1 collected records; review bundled dependencies |
-| charset-normalizer | 3.5.2 | MIT | Yes, local draft | Not declared in wheel | 1 collected records; review bundled dependencies |
-| click | 8.5.0 | BSD-3-Clause | Yes, local draft | https://github.com/pallets/click/ | 1 collected records; review bundled dependencies |
-| colorama | 0.4.6 | BSD License | Yes, local draft | https://github.com/tartley/colorama | 1 collected records; review bundled dependencies |
-| colorlog | 6.12.0 | MIT License | Yes, local draft | https://github.com/borntyping/python-colorlog | 1 collected records; review bundled dependencies |
-| crc32c | 2.9.post0 | GNU Lesser General Public License v2 or later (LGPLv2+) | Yes, local draft | Not declared in wheel | 4 collected records; review bundled dependencies |
-| cryptography | 50.0.2 | Apache-2.0 OR BSD-3-Clause | Yes, local draft | https://github.com/pyca/cryptography | 3 collected records; review bundled dependencies |
-| filelock | 4.0.11 | MIT | Yes, local draft | https://github.com/tox-dev/py-filelock | 1 collected records; review bundled dependencies |
-| frozenlist | 1.8.0 | Apache-2.0 | Yes, local draft | https://github.com/aio-libs/frozenlist | 1 collected records; review bundled dependencies |
-| fsspec | 2026.9.0 | BSD-3-Clause | Yes, local draft | https://github.com/fsspec/filesystem_spec | 1 collected records; review bundled dependencies |
-| future | 1.0.0 | OSI Approved | Yes, local draft | https://github.com/PythonCharmers/python-future | 1 collected records; review bundled dependencies |
-| h11 | 0.16.0 | MIT License | Yes, local draft | https://github.com/python-hyper/h11 | 1 collected records; review bundled dependencies |
-| hf-xet | 1.6.0 | Apache-2.0 | Yes, local draft | https://github.com/huggingface/xet-core | 1 collected records; review bundled dependencies |
-| httpcore | 1.0.9 | BSD-3-Clause | Yes, local draft | https://www.encode.io/httpcore/ | 1 collected records; review bundled dependencies |
-| httpcore2 | 2.13.1 | BSD-3-Clause | Yes, local draft | https://github.com/pydantic/httpx2 | 1 collected records; review bundled dependencies |
-| httpx | 0.28.1 | BSD License | Yes, local draft | https://github.com/encode/httpx | 1 collected records; review bundled dependencies |
-| httpx2 | 2.13.1 | BSD-3-Clause | Yes, local draft | https://github.com/pydantic/httpx2 | 1 collected records; review bundled dependencies |
-| huggingface_hub | 2.1.1 | Apache Software License | Yes, local draft | https://github.com/huggingface/huggingface_hub | 1 collected records; review bundled dependencies |
-| idna | 3.20 | BSD-3-Clause | Yes, local draft | https://github.com/kjd/idna | 1 collected records; review bundled dependencies |
-| imagesize | 2.0.1 | MIT | Yes, local draft | https://github.com/shibukawa/imagesize_py | 1 collected records; review bundled dependencies |
-| modelscope | 1.40.1 | Apache-2.0 | Yes, local draft | https://github.com/modelscope/modelscope | 2 collected records; review bundled dependencies |
-| modelscope-hub | 0.4.5 | Apache Software License | Yes, local draft | Not declared in wheel | 1 collected records; review bundled dependencies |
-| multidict | 6.9.1 | Apache License 2.0 | Yes, local draft | https://github.com/aio-libs/multidict | 1 collected records; review bundled dependencies |
-| networkx | 3.7 | BSD-3-Clause | Yes, local draft | https://networkx.org/ | 1 collected records; review bundled dependencies |
-| numpy | 2.3.5 | BSD License | Yes, local draft | https://numpy.org | 4 collected records; review bundled dependencies |
-| opencv-contrib-python | 4.10.0.84 | Apache Software License | Yes, local draft | https://github.com/opencv/opencv-python | 5 collected records; review bundled dependencies |
-| opt-einsum | 3.3.0 | OSI Approved | Yes, local draft | https://github.com/dgasmith/opt_einsum | 1 collected records; review bundled dependencies |
-| packaging | 26.3 | Apache-2.0 OR BSD-2-Clause | Yes, local draft | https://github.com/pypa/packaging | 5 collected records; review bundled dependencies |
-| paddleocr | 3.7.0 | Apache License 2.0 | Yes, local draft | https://github.com/PaddlePaddle/PaddleOCR | 1 collected records; review bundled dependencies |
-| paddlepaddle | 3.3.1 | Apache Software License | Yes, local draft | https://www.paddlepaddle.org.cn/ | 1 collected records; review bundled dependencies |
-| paddlex | 3.7.2 | Apache-2.0 | Yes, local draft | Not declared in wheel | 1 collected records; review bundled dependencies |
-| pandas | 3.0.6 | BSD License | Yes, local draft | https://pandas.pydata.org | 1 collected records; review bundled dependencies |
-| pillow | 12.3.0 | MIT-CMU | Yes, local draft | https://tidelift.com/subscription/pkg/pypi-pillow?utm_source=pypi-pillow&utm_medium=pypi | 1 collected records; review bundled dependencies |
-| prettytable | 3.18.0 | BSD-3-Clause | Yes, local draft | https://tidelift.com/subscription/pkg/pypi-prettytable?utm_source=pypi-prettytable&utm_medium=pypi | 1 collected records; review bundled dependencies |
-| propcache | 0.5.4 | Apache-2.0 | Yes, local draft | https://github.com/aio-libs/propcache | 2 collected records; review bundled dependencies |
-| protobuf | 7.36.2 | 3-Clause BSD License | Yes, local draft | https://developers.google.com/protocol-buffers/ | 1 collected records; review bundled dependencies |
-| psutil | 7.2.2 | BSD-3-Clause | Yes, local draft | https://github.com/giampaolo/psutil | 1 collected records; review bundled dependencies |
-| py-cpuinfo | 9.0.0 | MIT License | Yes, local draft | https://github.com/workhorsy/py-cpuinfo | 1 collected records; review bundled dependencies |
-| pyclipper | 1.4.0 | OSI Approved | Yes, local draft | https://github.com/fonttools/pyclipper | 1 collected records; review bundled dependencies |
-| pycparser | 3.0 | BSD-3-Clause | Yes, local draft | https://github.com/eliben/pycparser | 1 collected records; review bundled dependencies |
-| pycryptodome | 3.24.0 | BSD License | Yes, local draft | https://github.com/Legrandin/pycryptodome/ | 1 collected records; review bundled dependencies |
-| pydantic | 2.13.5 | MIT | Yes, local draft | https://github.com/pydantic/pydantic | 1 collected records; review bundled dependencies |
-| pydantic_core | 2.46.5 | MIT | Yes, local draft | https://github.com/pydantic | 1 collected records; review bundled dependencies |
-| pypdfium2 | 5.14.0 | BSD-3-Clause, Apache-2.0, dependency licenses | Yes, local draft | https://github.com/pypdfium2-team/pypdfium2 | 18 collected records; review bundled dependencies |
-| python-bidi | 0.6.11 | GNU Library or Lesser General Public License (LGPL) | Yes, local draft | https://github.com/MeirKriheli/python-bidi | 4 collected records; review bundled dependencies |
-| python-dateutil | 2.9.0.post0 | BSD License | Yes, local draft | https://github.com/dateutil/dateutil | 1 collected records; review bundled dependencies |
-| PyYAML | 6.0.2 | MIT License | Yes, local draft | http://lists.sourceforge.net/lists/listinfo/yaml-core | 1 collected records; review bundled dependencies |
-| requests | 2.34.2 | Apache Software License | Yes, local draft | https://github.com/psf/requests | 2 collected records; review bundled dependencies |
-| ruamel.yaml | 0.19.1 | MIT License | Yes, local draft | https://sourceforge.net/p/ruamel-yaml/ | 1 collected records; review bundled dependencies |
-| safetensors | 0.8.0 | Apache Software License | Yes, local draft | https://github.com/huggingface/safetensors | 1 collected records; review bundled dependencies |
-| setuptools | 84.0.0 | MIT | Yes, local draft | https://github.com/pypa/setuptools | 19 collected records; review bundled dependencies |
-| shapely | 2.1.2 | BSD License | Yes, local draft | https://github.com/shapely/shapely | 3 collected records; review bundled dependencies |
-| six | 1.17.0 | MIT License | Yes, local draft | https://github.com/benjaminp/six | 1 collected records; review bundled dependencies |
-| tqdm | 4.70.1 | MPL-2.0 AND MIT | Yes, local draft | https://tqdm.github.io | 1 collected records; review bundled dependencies |
-| truststore | 0.10.4 | MIT | Yes, local draft | https://github.com/sethmlarson/truststore | 1 collected records; review bundled dependencies |
-| typing-inspection | 0.4.4 | MIT | Yes, local draft | https://github.com/pydantic/typing-inspection | 1 collected records; review bundled dependencies |
-| typing_extensions | 4.16.0 | PSF-2.0 | Yes, local draft | https://github.com/python/typing_extensions | 1 collected records; review bundled dependencies |
-| tzdata | 2026.5 | Apache-2.0 | Yes, local draft | https://github.com/python/tzdata | 2 collected records; review bundled dependencies |
-| ujson | 6.0.0 | BSD-3-Clause AND TCL | Yes, local draft | https://github.com/ultrajson/ultrajson | 1 collected records; review bundled dependencies |
-| urllib3 | 2.8.0 | MIT | Yes, local draft | Not declared in wheel | 1 collected records; review bundled dependencies |
-| wcwidth | 0.9.2 | MIT License | Yes, local draft | https://github.com/jquast/wcwidth | 1 collected records; review bundled dependencies |
-| yarl | 1.25.1 | Apache-2.0 | Yes, local draft | https://github.com/aio-libs/yarl | 2 collected records; review bundled dependencies |
-| CPython | 3.12.14 | PSF-2.0 and included notices | Yes, local draft | https://www.python.org/ | 1 collected records; review bundled dependencies |
-| Qt Core/Gui/Widgets/Network/Svg and deployed plugins | 6.11.2 | LGPL-3.0/GPL/commercial alternatives; consult source SBOM | Yes, local draft | https://doc.qt.io/qt-6/licensing.html | 1 collected records; review bundled dependencies |
-| MinGW runtime | 13.1 | GPL-3.0 with GCC runtime exception; mingw-w64/winpthreads notices | Yes, local draft | https://gcc.gnu.org/onlinedocs/libstdc++/manual/license.html | 1 collected records; review bundled dependencies |
-| PP-OCRv6 small det/rec | Phase 6.1A verified assets | Apache-2.0 (official model cards) | Yes, local draft | https://huggingface.co/PaddlePaddle/PP-OCRv6_small_det | 0 collected records; review bundled dependencies |
+| Component | Version | License | Shipped? | Source | License/Notice Path | Redistribution Notes | Review Status |
+|---|---|---|---|---|---|---|---|
+| aiohappyeyeballs | 2.7.1 | Python Software Foundation License | Yes, technical candidate | https://github.com/aio-libs/aiohappyeyeballs | python-packages/aiohappyeyeballs/aiohappyeyeballs-2.7.1.dist-info/licenses/LICENSE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| aiohttp | 3.14.3 | Apache-2.0 AND MIT | Yes, technical candidate | https://github.com/aio-libs/aiohttp | python-packages/aiohttp/aiohttp-3.14.3.dist-info/licenses/LICENSE.txt; python-packages/aiohttp/aiohttp-3.14.3.dist-info/licenses/vendor/llhttp/LICENSE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| aiosignal | 1.4.0 | Apache Software License | Yes, technical candidate | https://github.com/aio-libs/aiosignal | python-packages/aiosignal/aiosignal-1.4.0.dist-info/licenses/LICENSE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| aistudio_sdk | 0.3.9 | Apache Software License | Yes, technical candidate | Not declared | python-packages/aistudio_sdk/aistudio_sdk-0.3.9.dist-info/licenses/LICENSE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| annotated-types | 0.8.0 | MIT | Yes, technical candidate | https://github.com/annotated-types/annotated-types | python-packages/annotated-types/annotated_types-0.8.0.dist-info/licenses/LICENSE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| anyio | 4.15.1 | MIT | Yes, technical candidate | https://github.com/agronholm/anyio | python-packages/anyio/anyio-4.15.1.dist-info/licenses/LICENSE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| attrs | 26.1.0 | MIT | Yes, technical candidate | https://tidelift.com/subscription/pkg/pypi-attrs?utm_source=pypi-attrs&utm_medium=pypi | python-packages/attrs/attrs-26.1.0.dist-info/licenses/LICENSE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| bce-python-sdk | 0.9.79 | Apache License 2.0 | Yes, technical candidate | http://bce.baidu.com | None collected; BLOCKED pending applicable notice review | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| certifi | 2026.7.22 | Mozilla Public License 2.0 (MPL 2.0) | Yes, technical candidate | https://github.com/certifi/python-certifi | python-packages/certifi/certifi-2026.7.22.dist-info/licenses/LICENSE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| cffi | 2.1.1 | MIT-0 | Yes, technical candidate | https://github.com/python-cffi/cffi | python-packages/cffi/cffi-2.1.1.dist-info/licenses/LICENSE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| chardet | 7.6.0 | 0BSD | Yes, technical candidate | https://github.com/chardet/chardet | python-packages/chardet/chardet-7.6.0.dist-info/licenses/LICENSE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| charset-normalizer | 3.5.2 | MIT | Yes, technical candidate | Not declared | python-packages/charset-normalizer/charset_normalizer-3.5.2.dist-info/licenses/LICENSE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| click | 8.5.0 | BSD-3-Clause | Yes, technical candidate | https://github.com/pallets/click/ | python-packages/click/click-8.5.0.dist-info/licenses/LICENSE.txt | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| colorama | 0.4.6 | BSD License | Yes, technical candidate | https://github.com/tartley/colorama | python-packages/colorama/colorama-0.4.6.dist-info/licenses/LICENSE.txt | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| colorlog | 6.12.0 | MIT License | Yes, technical candidate | https://github.com/borntyping/python-colorlog | python-packages/colorlog/colorlog-6.12.0.dist-info/licenses/LICENSE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| crc32c | 2.9.post0 | GNU Lesser General Public License v2 or later (LGPLv2+) | Yes, technical candidate | Not declared | python-packages/crc32c/crc32c-2.9.post0.dist-info/licenses/AUTHORS.google-crc32c; python-packages/crc32c/crc32c-2.9.post0.dist-info/licenses/LICENSE; python-packages/crc32c/crc32c-2.9.post0.dist-info/licenses/LICENSE.google-crc32c; python-packages/crc32c/crc32c-2.9.post0.dist-info/licenses/LICENSE.slice-by-8 | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| cryptography | 50.0.2 | Apache-2.0 OR BSD-3-Clause | Yes, technical candidate | https://github.com/pyca/cryptography | python-packages/cryptography/cryptography-50.0.2.dist-info/licenses/LICENSE; python-packages/cryptography/cryptography-50.0.2.dist-info/licenses/LICENSE.APACHE; python-packages/cryptography/cryptography-50.0.2.dist-info/licenses/LICENSE.BSD | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| filelock | 4.0.11 | MIT | Yes, technical candidate | https://github.com/tox-dev/py-filelock | python-packages/filelock/filelock-4.0.11.dist-info/licenses/LICENSE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| frozenlist | 1.8.0 | Apache-2.0 | Yes, technical candidate | https://github.com/aio-libs/frozenlist | python-packages/frozenlist/frozenlist-1.8.0.dist-info/licenses/LICENSE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| fsspec | 2026.9.0 | BSD-3-Clause | Yes, technical candidate | https://github.com/fsspec/filesystem_spec | python-packages/fsspec/fsspec-2026.9.0.dist-info/licenses/LICENSE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| future | 1.0.0 | OSI Approved | Yes, technical candidate | https://github.com/PythonCharmers/python-future | python-packages/future/future-1.0.0.dist-info/LICENSE.txt | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| h11 | 0.16.0 | MIT License | Yes, technical candidate | https://github.com/python-hyper/h11 | python-packages/h11/h11-0.16.0.dist-info/licenses/LICENSE.txt | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| hf-xet | 1.6.0 | Apache-2.0 | Yes, technical candidate | https://github.com/huggingface/xet-core | python-packages/hf-xet/hf_xet-1.6.0.dist-info/licenses/LICENSE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| httpcore | 1.0.9 | BSD-3-Clause | Yes, technical candidate | https://www.encode.io/httpcore/ | python-packages/httpcore/httpcore-1.0.9.dist-info/licenses/LICENSE.md | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| httpcore2 | 2.13.1 | BSD-3-Clause | Yes, technical candidate | https://github.com/pydantic/httpx2 | python-packages/httpcore2/httpcore2-2.13.1.dist-info/licenses/LICENSE.md | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| httpx | 0.28.1 | BSD License | Yes, technical candidate | https://github.com/encode/httpx | python-packages/httpx/httpx-0.28.1.dist-info/licenses/LICENSE.md | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| httpx2 | 2.13.1 | BSD-3-Clause | Yes, technical candidate | https://github.com/pydantic/httpx2 | python-packages/httpx2/httpx2-2.13.1.dist-info/licenses/LICENSE.md | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| huggingface_hub | 2.1.1 | Apache Software License | Yes, technical candidate | https://github.com/huggingface/huggingface_hub | python-packages/huggingface_hub/huggingface_hub-2.1.1.dist-info/licenses/LICENSE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| idna | 3.20 | BSD-3-Clause | Yes, technical candidate | https://github.com/kjd/idna | python-packages/idna/idna-3.20.dist-info/licenses/LICENSE.md | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| imagesize | 2.0.1 | MIT | Yes, technical candidate | https://github.com/shibukawa/imagesize_py | python-packages/imagesize/imagesize-2.0.1.dist-info/licenses/LICENSE.rst | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| modelscope | 1.40.1 | Apache-2.0 | Yes, technical candidate | https://github.com/modelscope/modelscope | python-packages/modelscope/modelscope-1.40.1.dist-info/licenses/LICENSE; python-packages/modelscope/modelscope/pipelines/cv/license_plate_detection_pipeline.py | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| modelscope-hub | 0.4.5 | Apache Software License | Yes, technical candidate | Not declared | python-packages/modelscope-hub/modelscope_hub-0.4.5.dist-info/licenses/LICENSE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| multidict | 6.9.1 | Apache License 2.0 | Yes, technical candidate | https://github.com/aio-libs/multidict | python-packages/multidict/multidict-6.9.1.dist-info/licenses/LICENSE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| networkx | 3.7 | BSD-3-Clause | Yes, technical candidate | https://networkx.org/ | python-packages/networkx/networkx-3.7.dist-info/licenses/LICENSE.txt | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| numpy | 2.3.5 | BSD License | Yes, technical candidate | https://numpy.org | python-packages/numpy/numpy-2.3.5.dist-info/LICENSE.txt; python-packages/numpy/numpy/_core/include/numpy/random/LICENSE.txt; python-packages/numpy/numpy/ma/LICENSE; python-packages/numpy/numpy/random/LICENSE.md | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| opencv-contrib-python | 4.10.0.84 | Apache Software License | Yes, technical candidate | https://github.com/opencv/opencv-python | python-packages/opencv-contrib-python/cv2/LICENSE-3RD-PARTY.txt; python-packages/opencv-contrib-python/cv2/LICENSE.txt; python-packages/opencv-contrib-python/cv2/data/haarcascade_license_plate_rus_16stages.xml; python-packages/opencv-contrib-python/opencv_contrib_python-4.10.0.84.dist-info/LICENSE-3RD-PARTY.txt; python-packages/opencv-contrib-python/opencv_contrib_python-4.10.0.84.dist-info/LICENSE.txt | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| opt-einsum | 3.3.0 | OSI Approved | Yes, technical candidate | https://github.com/dgasmith/opt_einsum | python-packages/opt-einsum/opt_einsum-3.3.0.dist-info/LICENSE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| packaging | 26.3 | Apache-2.0 OR BSD-2-Clause | Yes, technical candidate | https://github.com/pypa/packaging | python-packages/packaging/packaging-26.3.dist-info/licenses/LICENSE; python-packages/packaging/packaging-26.3.dist-info/licenses/LICENSE.APACHE; python-packages/packaging/packaging-26.3.dist-info/licenses/LICENSE.BSD; python-packages/packaging/packaging/licenses/__init__.py; python-packages/packaging/packaging/licenses/_spdx.py | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| paddleocr | 3.7.0 | Apache License 2.0 | Yes, technical candidate | https://github.com/PaddlePaddle/PaddleOCR | python-packages/paddleocr/paddleocr-3.7.0.dist-info/LICENSE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| paddlepaddle | 3.3.1 | Apache Software License | Yes, technical candidate | https://www.paddlepaddle.org.cn/ | python-packages/paddlepaddle/paddlepaddle-3.3.1.dist-info/LICENSE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| paddlex | 3.7.2 | Apache-2.0 | Yes, technical candidate | Not declared | python-packages/paddlex/paddlex-3.7.2.dist-info/licenses/LICENSE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| pandas | 3.0.6 | BSD License | Yes, technical candidate | https://pandas.pydata.org | python-packages/pandas/pandas-3.0.6.dist-info/LICENSE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| pillow | 12.3.0 | MIT-CMU | Yes, technical candidate | https://tidelift.com/subscription/pkg/pypi-pillow?utm_source=pypi-pillow&utm_medium=pypi | python-packages/pillow/pillow-12.3.0.dist-info/licenses/LICENSE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| prettytable | 3.18.0 | BSD-3-Clause | Yes, technical candidate | https://tidelift.com/subscription/pkg/pypi-prettytable?utm_source=pypi-prettytable&utm_medium=pypi | python-packages/prettytable/prettytable-3.18.0.dist-info/licenses/LICENSE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| propcache | 0.5.4 | Apache-2.0 | Yes, technical candidate | https://github.com/aio-libs/propcache | python-packages/propcache/propcache-0.5.4.dist-info/licenses/LICENSE; python-packages/propcache/propcache-0.5.4.dist-info/licenses/NOTICE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| protobuf | 7.36.2 | 3-Clause BSD License | Yes, technical candidate | https://developers.google.com/protocol-buffers/ | python-packages/protobuf/protobuf-7.36.2.dist-info/LICENSE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| psutil | 7.2.2 | BSD-3-Clause | Yes, technical candidate | https://github.com/giampaolo/psutil | python-packages/psutil/psutil-7.2.2.dist-info/LICENSE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| py-cpuinfo | 9.0.0 | MIT License | Yes, technical candidate | https://github.com/workhorsy/py-cpuinfo | python-packages/py-cpuinfo/py_cpuinfo-9.0.0.dist-info/LICENSE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| pyclipper | 1.4.0 | OSI Approved | Yes, technical candidate | https://github.com/fonttools/pyclipper | python-packages/pyclipper/pyclipper-1.4.0.dist-info/licenses/LICENSE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| pycparser | 3.0 | BSD-3-Clause | Yes, technical candidate | https://github.com/eliben/pycparser | python-packages/pycparser/pycparser-3.0.dist-info/licenses/LICENSE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| pycryptodome | 3.24.0 | BSD License | Yes, technical candidate | https://github.com/Legrandin/pycryptodome/ | python-packages/pycryptodome/pycryptodome-3.24.0.dist-info/LICENSE.rst | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| pydantic | 2.13.5 | MIT | Yes, technical candidate | https://github.com/pydantic/pydantic | python-packages/pydantic/pydantic-2.13.5.dist-info/licenses/LICENSE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| pydantic_core | 2.46.5 | MIT | Yes, technical candidate | https://github.com/pydantic | python-packages/pydantic_core/pydantic_core-2.46.5.dist-info/licenses/LICENSE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| pypdfium2 | 5.14.0 | BSD-3-Clause, Apache-2.0, dependency licenses | Yes, technical candidate | https://github.com/pypdfium2-team/pypdfium2 | python-packages/pypdfium2/pypdfium2-5.14.0.dist-info/licenses/LICENSES/Apache-2.0.txt; python-packages/pypdfium2/pypdfium2-5.14.0.dist-info/licenses/LICENSES/BSD-3-Clause.txt; python-packages/pypdfium2/pypdfium2-5.14.0.dist-info/licenses/LICENSES/CC-BY-4.0.txt; python-packages/pypdfium2/pypdfium2-5.14.0.dist-info/licenses/data/windows_x64/BUILD_LICENSES/abseil.txt; python-packages/pypdfium2/pypdfium2-5.14.0.dist-info/licenses/data/windows_x64/BUILD_LICENSES/agg23.txt; python-packages/pypdfium2/pypdfium2-5.14.0.dist-info/licenses/data/windows_x64/BUILD_LICENSES/fast_float.txt; python-packages/pypdfium2/pypdfium2-5.14.0.dist-info/licenses/data/windows_x64/BUILD_LICENSES/freetype.txt; python-packages/pypdfium2/pypdfium2-5.14.0.dist-info/licenses/data/windows_x64/BUILD_LICENSES/icu.txt; python-packages/pypdfium2/pypdfium2-5.14.0.dist-info/licenses/data/windows_x64/BUILD_LICENSES/lcms.txt; python-packages/pypdfium2/pypdfium2-5.14.0.dist-info/licenses/data/windows_x64/BUILD_LICENSES/libjpeg_turbo.ijg; python-packages/pypdfium2/pypdfium2-5.14.0.dist-info/licenses/data/windows_x64/BUILD_LICENSES/libjpeg_turbo.md; python-packages/pypdfium2/pypdfium2-5.14.0.dist-info/licenses/data/windows_x64/BUILD_LICENSES/libopenjpeg.txt; python-packages/pypdfium2/pypdfium2-5.14.0.dist-info/licenses/data/windows_x64/BUILD_LICENSES/libpng.txt; python-packages/pypdfium2/pypdfium2-5.14.0.dist-info/licenses/data/windows_x64/BUILD_LICENSES/llvm-libc.txt; python-packages/pypdfium2/pypdfium2-5.14.0.dist-info/licenses/data/windows_x64/BUILD_LICENSES/pdfium-binaries.txt; python-packages/pypdfium2/pypdfium2-5.14.0.dist-info/licenses/data/windows_x64/BUILD_LICENSES/pdfium.txt; python-packages/pypdfium2/pypdfium2-5.14.0.dist-info/licenses/data/windows_x64/BUILD_LICENSES/simdutf.txt; python-packages/pypdfium2/pypdfium2-5.14.0.dist-info/licenses/data/windows_x64/BUILD_LICENSES/zlib.txt | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| python-bidi | 0.6.11 | GNU Library or Lesser General Public License (LGPL) | Yes, technical candidate | https://github.com/MeirKriheli/python-bidi | python-packages/python-bidi/python_bidi-0.6.11.dist-info/licenses/AUTHORS.rst; python-packages/python-bidi/python_bidi-0.6.11.dist-info/licenses/COPYING; python-packages/python-bidi/python_bidi-0.6.11.dist-info/licenses/COPYING.LESSER; python-packages/python-bidi/python_bidi-0.6.11.dist-info/licenses/LICENSE-THIRD-PARTY.yml | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| python-dateutil | 2.9.0.post0 | BSD License | Yes, technical candidate | https://github.com/dateutil/dateutil | python-packages/python-dateutil/python_dateutil-2.9.0.post0.dist-info/LICENSE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| PyYAML | 6.0.2 | MIT License | Yes, technical candidate | http://lists.sourceforge.net/lists/listinfo/yaml-core | python-packages/PyYAML/PyYAML-6.0.2.dist-info/LICENSE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| requests | 2.34.2 | Apache Software License | Yes, technical candidate | https://github.com/psf/requests | python-packages/requests/requests-2.34.2.dist-info/licenses/LICENSE; python-packages/requests/requests-2.34.2.dist-info/licenses/NOTICE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| ruamel.yaml | 0.19.1 | MIT License | Yes, technical candidate | https://sourceforge.net/p/ruamel-yaml/ | python-packages/ruamel.yaml/ruamel_yaml-0.19.1.dist-info/licenses/LICENSE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| safetensors | 0.8.0 | Apache Software License | Yes, technical candidate | https://github.com/huggingface/safetensors | python-packages/safetensors/safetensors-0.8.0.dist-info/licenses/LICENSE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| setuptools | 84.0.0 | MIT | Yes, technical candidate | https://github.com/pypa/setuptools | python-packages/setuptools/setuptools-84.0.0.dist-info/licenses/LICENSE; python-packages/setuptools/setuptools/_vendor/autocommand-2.2.2.dist-info/LICENSE; python-packages/setuptools/setuptools/_vendor/backports.tarfile-1.2.0.dist-info/LICENSE; python-packages/setuptools/setuptools/_vendor/importlib_metadata-8.7.1.dist-info/licenses/LICENSE; python-packages/setuptools/setuptools/_vendor/jaraco.text-4.0.0.dist-info/LICENSE; python-packages/setuptools/setuptools/_vendor/jaraco_context-6.1.0.dist-info/licenses/LICENSE; python-packages/setuptools/setuptools/_vendor/jaraco_functools-4.4.0.dist-info/licenses/LICENSE; python-packages/setuptools/setuptools/_vendor/more_itertools-10.8.0.dist-info/licenses/LICENSE; python-packages/setuptools/setuptools/_vendor/packaging-26.0.dist-info/licenses/LICENSE; python-packages/setuptools/setuptools/_vendor/packaging-26.0.dist-info/licenses/LICENSE.APACHE; python-packages/setuptools/setuptools/_vendor/packaging-26.0.dist-info/licenses/LICENSE.BSD; python-packages/setuptools/setuptools/_vendor/packaging/licenses/__init__.py; python-packages/setuptools/setuptools/_vendor/packaging/licenses/_spdx.py; python-packages/setuptools/setuptools/_vendor/platformdirs-4.4.0.dist-info/licenses/LICENSE; python-packages/setuptools/setuptools/_vendor/tomli-2.4.0.dist-info/licenses/LICENSE; python-packages/setuptools/setuptools/_vendor/wheel-0.46.3.dist-info/licenses/LICENSE.txt; python-packages/setuptools/setuptools/_vendor/zipp-3.23.0.dist-info/licenses/LICENSE; python-packages/setuptools/setuptools/config/NOTICE; python-packages/setuptools/setuptools/config/_validate_pyproject/NOTICE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| shapely | 2.1.2 | BSD License | Yes, technical candidate | https://github.com/shapely/shapely | python-packages/shapely/shapely-2.1.2.dist-info/licenses/LICENSE.txt; python-packages/shapely/shapely-2.1.2.dist-info/licenses/LICENSE_GEOS; python-packages/shapely/shapely-2.1.2.dist-info/licenses/LICENSE_win32 | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| six | 1.17.0 | MIT License | Yes, technical candidate | https://github.com/benjaminp/six | python-packages/six/six-1.17.0.dist-info/LICENSE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| tqdm | 4.70.1 | MPL-2.0 AND MIT | Yes, technical candidate | https://tqdm.github.io | python-packages/tqdm/tqdm-4.70.1.dist-info/licenses/LICENCE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| truststore | 0.10.4 | MIT | Yes, technical candidate | https://github.com/sethmlarson/truststore | python-packages/truststore/truststore-0.10.4.dist-info/licenses/LICENSE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| typing-inspection | 0.4.4 | MIT | Yes, technical candidate | https://github.com/pydantic/typing-inspection | python-packages/typing-inspection/typing_inspection-0.4.4.dist-info/licenses/LICENSE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| typing_extensions | 4.16.0 | PSF-2.0 | Yes, technical candidate | https://github.com/python/typing_extensions | python-packages/typing_extensions/typing_extensions-4.16.0.dist-info/licenses/LICENSE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| tzdata | 2026.5 | Apache-2.0 | Yes, technical candidate | https://github.com/python/tzdata | python-packages/tzdata/tzdata-2026.5.dist-info/licenses/LICENSE; python-packages/tzdata/tzdata-2026.5.dist-info/licenses/licenses/LICENSE_APACHE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| ujson | 6.0.0 | BSD-3-Clause AND TCL | Yes, technical candidate | https://github.com/ultrajson/ultrajson | python-packages/ujson/ujson-6.0.0.dist-info/licenses/LICENSE.txt | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| urllib3 | 2.8.0 | MIT | Yes, technical candidate | Not declared | python-packages/urllib3/urllib3-2.8.0.dist-info/licenses/LICENSE.txt | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| wcwidth | 0.9.2 | MIT License | Yes, technical candidate | https://github.com/jquast/wcwidth | python-packages/wcwidth/wcwidth-0.9.2.dist-info/licenses/LICENSE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| yarl | 1.25.1 | Apache-2.0 | Yes, technical candidate | https://github.com/aio-libs/yarl | python-packages/yarl/yarl-1.25.1.dist-info/licenses/LICENSE; python-packages/yarl/yarl-1.25.1.dist-info/licenses/NOTICE | retain upstream notices; binary/transitive obligations require review | REVIEW REQUIRED |
+| CPython | 3.12.14 | PSF-2.0 and included notices | Yes, technical candidate | https://www.python.org/ | python/LICENSE.txt | Retain notices; complete owner/transitive redistribution review before release | REVIEW REQUIRED |
+| Qt Core/Gui/Widgets/Network/Svg and deployed plugins | 6.11.2 | LGPL-3.0/GPL/commercial alternatives; consult source SBOM | Yes, technical candidate | https://doc.qt.io/qt-6/licensing.html | qt/qtbase-6.11.2.source.spdx | owner must confirm Qt acquisition and applicable license; source/relinking/third-party notices review pending | OWNER REVIEW REQUIRED |
+| MinGW runtime | 13.1 | GPL-3.0 with GCC runtime exception; mingw-w64/winpthreads notices | Yes, technical candidate | https://gcc.gnu.org/onlinedocs/libstdc++/manual/license.html | mingw/gcc/COPYING.RUNTIME | Retain notices; complete owner/transitive redistribution review before release | REVIEW REQUIRED |
+| Microsoft VC runtime | 14.51.36247.0 | Microsoft Software License Terms; OWNER REVIEW REQUIRED | Yes, technical candidate | https://aka.ms/vc14/vc_redist.x64.exe | microsoft-vc/LICENSE.txt; microsoft-vc/redistribution.json | Verified official bytes/signatures do not establish owner redistribution entitlement | OWNER REVIEW REQUIRED |
+| PP-OCRv6_small_det | Phase 6.1A verified assets | Apache-2.0 | Yes, technical candidate | https://huggingface.co/PaddlePaddle/PP-OCRv6_small_det | supplementary/models/PP-OCRv6_small_det_MODEL_CARD.md; supplementary/models/Apache-2.0.txt | Official card declaration and weight identity verified; preserve notices; owner release review outstanding | REVIEW REQUIRED |
+| PP-OCRv6_small_rec | Phase 6.1A verified assets | Apache-2.0 | Yes, technical candidate | https://huggingface.co/PaddlePaddle/PP-OCRv6_small_rec | supplementary/models/PP-OCRv6_small_rec_MODEL_CARD.md; supplementary/models/Apache-2.0.txt | Official card declaration and weight identity verified; preserve notices; owner release review outstanding | REVIEW REQUIRED |
 
-## Binary and Transitive Review Still Required
+## Native Subcomponents
 
-| Component | Evidence / Version | Distributed | License / Source | Outstanding Requirement |
-|---|---|---|---|---|
-| Intel MKLML / libiomp5 / oneDNN | Paddle wheel: mklml.dll, libiomp5md.dll, mkldnn.dll; independent binary versions not verified | Yes | Upstream binary terms/third-party notices require review; https://github.com/PaddlePaddle/Paddle | Wheel Apache license is not proof for every embedded binary |
-| BLAS / LAPACK / GCC Fortran / quadmath | Paddle wheel DLLs; independent versions not verified | Yes | https://github.com/PaddlePaddle/Paddle ; component terms require review | Preserve component-specific notices and runtime exceptions |
-| OpenSSL / SQLite / libffi / Tcl/Tk | CPython DLL directory; exact native versions not independently audited | Yes | https://docs.python.org/3/license.html ; component-specific terms | CPython aggregate text and upstream notices require review |
-| NumPy / Pandas / Shapely vendored native libraries | Wheel directories and collected aggregate license files | Yes | Corresponding wheel notices | Review each vendored library, not only Python-package license |
-| OpenCV bundled third parties | OpenCV wheel license/third-party files retained | Yes | https://github.com/opencv/opencv-python | Review included codecs/native dependency notices |
-| Qt bundled third parties | SDK source SPDX and CycloneDX files retained | Yes, only deployed modules/plugins | https://doc.qt.io/qt-6/licenses-used-in-qt.html | Collect required full text/notices and verify exact deployed-component coverage |
-| Microsoft VC runtime | Python base already supplies vcruntime140/140_1; msvcp140/vcomp140 absent | Partial | Microsoft Software License Terms | Approved app-local runtime input and owner review outstanding |
+These actual DLL groups belong to the wheel/Qt rows above. Their independent
+upstream versions and obligations are not yet reconciled. Wheel-level licensing
+does not automatically clear all bundled native libraries.
 
-## Not Distributed
+| Component | Version | License | Shipped? | Source | License/Notice Path | Redistribution Notes | Review Status |
+|---|---|---|---|---|---|---|---|
+| Paddle MKL/oneDNN/OpenMP: mklml.dll, mkldnn.dll, libiomp5md.dll | Independent versions not verified; Paddle 3.3.1 wheel | Component-specific terms not verified | Yes | Pinned PaddlePaddle wheel | python-packages/paddlepaddle/; reconciliation incomplete | MKL-DNN disabled does not remove shipped notice duties; vcomp140 dependency supplied | REVIEW REQUIRED |
+| Paddle BLAS/LAPACK/Fortran/GCC: libblas.dll, liblapack.dll, libgfortran-3.dll, libquadmath-0.dll, libgcc_s_seh-1.dll | Independent versions not verified; Paddle 3.3.1 wheel | Component-specific terms not verified | Yes | Pinned PaddlePaddle wheel | python-packages/paddlepaddle/; reconciliation incomplete | Verify notices, runtime exceptions and source duties for these actual files | REVIEW REQUIRED |
+| Paddle auxiliary: common.dll, phi.dll, warpctc.dll, warprnnt.dll | Individual versions not verified; Paddle 3.3.1 wheel | Upstream/subcomponent terms require reconciliation | Yes | Pinned PaddlePaddle wheel | python-packages/paddlepaddle/ | Preserve and verify component-specific notices | REVIEW REQUIRED |
+| Qt image/style/network/TLS plugins and QtSvg | 6.11.2 | Acquisition-dependent; transitive terms not fully reviewed | Yes | Qt SDK via windeployqt | qt/qtbase-6.11.2.source.spdx; additional texts pending | SBOM is not complete license/source clearance | OWNER REVIEW REQUIRED |
 
-Tesseract 5.4 and Leptonica are installed on the development machine but not copied
-into the portable draft. The installation has Apache-2.0 top-level Tesseract text;
-its numerous transitive DLLs have not received a complete redistribution audit.
-Developer Tesseract remains supported. Portable selection reports unavailable
-instead of searching Program Files/PATH and borrowing the installed engine.
-The installer, PyInstaller, build tools and private benchmark media are not part of
-the chosen portable package. No public release or zip is authorized as verified.
+OpenCV, NumPy, Pillow, Shapely, PDFium, cryptography and other actual wheel-native
+payloads are represented in their wheel rows with nested notices. Additional native
+obligations require reconciliation. Zero-notice rows (such as bce-python-sdk) are
+explicit blockers, not silently approved. Tesseract, pip, PyInstaller, pefile, the
+archive extraction tool and VS/SDK build tools are not shipped in this candidate.
+
+## Model-specific Evidence
+
+Official PaddlePaddle model cards at fixed revisions independently declare Apache-2.0
+for det and rec. Their LFS weight hashes match the six-file Phase 6.1A model catalog.
+Card revisions, URLs and SHA256 values are in `scripts/runtime-notices.json`.
+Actual cards and the complete upstream Apache-2.0 text are copied under
+`licenses/supplementary/models/`, with supplementary provenance JSON. The inspected
+repositories do not publish separate LICENSE/NOTICE files; that observation is
+not a conclusion that no further obligations exist. No weights were downloaded
+or changed. Owner/transitive review remains **REVIEW REQUIRED**.
+
+## Release Decision
+
+Inventory and technical provenance identify outstanding obligations but grant no
+clearance. Public ZIP creation remains blocked by owner/license review, clean Windows
+and actually disconnected OCR acceptance. This technical task is not legal review.

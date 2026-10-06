@@ -1,0 +1,10 @@
+<Configuration>
+  <Networking>Disable</Networking>
+  <MappedFolders>
+    <MappedFolder>
+      <HostFolder>@ABSOLUTE_PORTABLE_FOLDER@</HostFolder>
+      <SandboxFolder>C:\Users\WDAGUtilityAccount\Desktop\PortableInput</SandboxFolder>
+      <ReadOnly>true</ReadOnly>
+    </MappedFolder>
+  </MappedFolders>
+</Configuration>

@@ -12,8 +12,9 @@ DLLs/plugins deployed by `windeployqt`. Development overrides remain supported.
 Release/Debug builds and 13/13 CTest suites pass. Local minimal-PATH OCR,
 Unicode/space model paths (with verified user-cache staging), read-only install
 directory, real desktop capture and Stop/Start helper reuse were tested. However,
-the current draft lacks app-local `msvcp140.dll` and `vcomp140.dll`; native audit
-correctly returns failure. Clean-machine/disconnected-network acceptance and
+the regenerated candidate now includes hash-pinned, officially signed Microsoft
+VC runtime inputs and passes the 262-binary PE audit with zero missing candidates.
+Clean-machine/disconnected-network acceptance and
 full redistribution-license review are outstanding. Do not distribute this
 draft as a verified self-contained release. No zip or installer is produced.
 
@@ -282,7 +283,7 @@ components.
 ## 尚未实现
 
 - 完整 Bilibili 连续字幕与桌面长期稳定性验收
-- Standalone OCR runtime packaging / installer (Phase 6.1C)
+- Portable release acceptance / redistribution clearance (Phase 6.1C); installer is out of scope
 - Overlay click-through
 - Hook
 - TTS

@@ -1,0 +1,27 @@
+{
+  "files": [
+    {
+      "path": "models/PP-OCRv6_small_det_MODEL_CARD.md",
+      "source_url": "https://huggingface.co/PaddlePaddle/PP-OCRv6_small_det/raw/106c97591b235f607453300d9fc8c1cad1b25488/README.md",
+      "revision": "106c97591b235f607453300d9fc8c1cad1b25488",
+      "license": "Apache-2.0",
+      "sha256": "525eef5858b48c009772cd9df422e8a440e1cc3d0cd7e0b5d4fbe8400dc2ecd1"
+    },
+    {
+      "path": "models/PP-OCRv6_small_rec_MODEL_CARD.md",
+      "source_url": "https://huggingface.co/PaddlePaddle/PP-OCRv6_small_rec/raw/bd619643acac4b9650c040234da8d944476ee3f1/README.md",
+      "revision": "bd619643acac4b9650c040234da8d944476ee3f1",
+      "license": "Apache-2.0",
+      "sha256": "832f68feddefeffd63ba133b961b7c44a9603d5cde20c14c87383c9440694f7a"
+    },
+    {
+      "path": "models/Apache-2.0.txt",
+      "source_url": "https://raw.githubusercontent.com/PaddlePaddle/PaddleOCR/main/LICENSE",
+      "license": "Apache-2.0",
+      "sha256": "3840c5c0c61c294264d2dd77b8777be6ddd90121ef4e0e64abcd22edea581d6e"
+    }
+  ],
+  "model_weight_identity": "Official model API LFS SHA256 equals both Phase 6.1A pinned pdiparams hashes",
+  "model_card_evidence": "Both official model revisions explicitly declare apache-2.0; no separate LICENSE/NOTICE sibling published",
+  "review_status": "REVIEW REQUIRED"
+}

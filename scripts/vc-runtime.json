@@ -1,0 +1,58 @@
+{
+  "version": "14.51.36247.0",
+  "source_url": "https://aka.ms/vc14/vc_redist.x64.exe",
+  "installer_sha256": "843068991daaa1f73ad9f6239bce4d0f6a07a51f18c37ea2a867e9beca71295c",
+  "installer_signature": {
+    "signer": "CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US",
+    "status": "Valid"
+  },
+  "license_source_url": "https://visualstudio.microsoft.com/wp-content/uploads/2025/10/Visual-C-V14-License-Redistributable_and_Runtime_ENU.docx",
+  "license_input_sha256": "08651651a7602fc7c0e2763de0fde1ff9f868df2780597cd1775ee9d6441c783",
+  "license_file": "LICENSE.txt",
+  "license_sha256": "c15f0776c632b97bc3b01dbc3090ae347bb406235ae7132601bbaba91624e4fc",
+  "review_status": "OWNER REVIEW REQUIRED",
+  "owner_redistribution_confirmed": false,
+  "extraction": "Burn v2 CABs and verified payloads; no installation; x64 actual PE import cohort",
+  "files": [
+    {
+      "path": "msvcp140.dll",
+      "sha256": "7c26614e1d733892c2deac7e245ce115504b1d80592dd0a01b08e3e5a55f89ca",
+      "bytes": 643512,
+      "version": "14.51.36247.0",
+      "signature": {
+        "status": "Valid",
+        "signer": "CN=Microsoft Windows Software Compatibility Publisher, O=Microsoft Corporation, L=Redmond, S=Washington, C=US"
+      }
+    },
+    {
+      "path": "vcomp140.dll",
+      "sha256": "95d4ce4a6802d1e18b5e0e1722cc30ea72ca7e033f83828f05c0b7b993fe7cbf",
+      "bytes": 212920,
+      "version": "14.51.36247.0",
+      "signature": {
+        "signer": "CN=Microsoft Windows Software Compatibility Publisher, O=Microsoft Corporation, L=Redmond, S=Washington, C=US",
+        "status": "Valid"
+      }
+    },
+    {
+      "path": "vcruntime140.dll",
+      "sha256": "d1f4225df2cd877dbf130d5668a021dce3f94118455ff5ec952061c30afc9ce7",
+      "bytes": 178616,
+      "version": "14.51.36247.0",
+      "signature": {
+        "signer": "CN=Microsoft Windows Software Compatibility Publisher, O=Microsoft Corporation, L=Redmond, S=Washington, C=US",
+        "status": "Valid"
+      }
+    },
+    {
+      "path": "vcruntime140_1.dll",
+      "sha256": "a7146c08f89fe5b04541ab507cdb59ff7b44534d4ba3c668a426c6450a03434e",
+      "bytes": 50112,
+      "version": "14.51.36247.0",
+      "signature": {
+        "status": "Valid",
+        "signer": "CN=Microsoft Windows Software Compatibility Publisher, O=Microsoft Corporation, L=Redmond, S=Washington, C=US"
+      }
+    }
+  ]
+}

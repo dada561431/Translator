@@ -6,19 +6,30 @@ Phase 6.1C is **not fully complete**. Packaging infrastructure is implemented
 and locally exercised, but the generated folder is a **technical draft**, not a
 verified redistributable release. Do not distribute or label it fully portable.
 
+Current final-acceptance evidence (2026-10-06) is in
+[the 75-point release-gate report](windows-portable-final-acceptance.md).
+The historical implementation evidence below is retained, not substituted for
+new candidate measurements.
+
 Outstanding gates:
 
-- Static dependency audit fails on app-local `msvcp140.dll` (pyclipper) and
-  `vcomp140.dll` (Paddle's shipped mkldnn.dll). Installed developer-machine CRTs
-  can mask this at execution time. Disabling MKL-DNN does not justify deleting
-  its shipped DLL without dependency testing.
+- The regenerated candidate passes static candidate-presence audit: 262 PE files,
+  zero missing dependencies. Microsoft 14.51.36247.0 app-local DLLs are extracted
+  from the official signed EXE, hash-pinned and loaded from the candidate in real
+  import tests. mkldnn.dll is retained; MKL-DNN remains disabled. This static audit
+  is not a clean Windows loader proof or a redistribution clearance.
 - No clean Windows VM, Sandbox or second PC was available. Minimal PATH and
   relocation on this developer machine are not clean-machine acceptance.
 - Actual disconnected-network acceptance remains pending. Offline flags and
   local-model loading were tested, but network connectivity was not disabled.
-- Redistribution review remains pending: Qt acquisition/applicable terms,
-  supplementary model notices, and vendored native-library notices, including
-  an approved Microsoft VC runtime input. See the license inventory.
+- Redistribution review remains pending: Qt acquisition/applicable terms and
+  VC owner entitlement remain OWNER REVIEW REQUIRED. Model-specific official
+  cards/Apache text and matching weight identity are recorded; native-library
+  obligations remain REVIEW REQUIRED. See the actual shipped license inventory.
+- One read-only Unicode-path self-check timed out at 30,106 ms on helper startup.
+  A later same-candidate run passed 20/20 and warm Stop/Start; root cause is not
+  established and the failure is not declared fixed. Clean first-launch verification
+  must retain this observation, not cherry-pick the passing rerun.
 
 No installer or release zip was produced. No security controls were disabled.
 The no-subtitle false positive remains a Known Limitation; filtering is deferred.
@@ -44,7 +55,8 @@ Build-only pip/PyInstaller/hooks/pefile tools are excluded from the runtime.
 The selected helper is `paddle_helper.py`, launched with bundled `python.exe`.
 It is not a venv: no pyvenv.cfg, external base interpreter, pip, registry search,
 user site or development checkout is used by its isolated `python312._pth`.
-Full clean-machine proof is still pending because of the CRT gate above.
+Full clean-machine proof is still pending; resolving the static CRT gate does not
+replace executing the complete candidate on a clean Windows host.
 
 ## Layout and Launch
 
@@ -123,7 +135,7 @@ Selecting it reports unavailable and directs the user to PP-OCRv6 Small. This is
 not a working portable Tesseract fallback. Development-mode selection and existing
 tests remain unchanged. No silent engine switching is added.
 
-## Local Test Evidence
+## Historical Implementation Test Evidence
 
 All latency figures below are local synthetic `Hello Portable OCR` measurements,
 not repeated video accuracy benchmarks or clean-machine figures. Warm statistics
@@ -153,7 +165,7 @@ Reports, QA-only probe binaries and synthetic screenshots are under ignored
 `.cache/packaging-validation/`; they are not shipped, committed or uploaded.
 The official folder contains no QA probe executable or private video screenshot.
 
-## Reproduce the Draft
+## Historical Initial Draft Command
 
 Run from the Translator checkout. Paths below are local command inputs only;
 they are not hardcoded into CMake or production source. PythonBase must be a
@@ -220,7 +232,7 @@ DLL load paths and timings. Do not modify the developer machine's system PATH,
 rename installed SDKs or disable Defender to simulate a clean computer.
 Only after those gates pass should a release zip/hash be generated.
 
-## Requested 100-point Report
+## Historical Initial 100-point Report (Superseded by Final Acceptance)
 
 Final draft measurement after build-only modules were excluded:
 15,728 manifest payload files, 790.43 MiB payload, 793.64 MiB including manifest;
