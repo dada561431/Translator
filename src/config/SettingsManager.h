@@ -6,6 +6,7 @@
 #include <QRect>
 #include <QString>
 #include <QStringList>
+#include "config/OverlayAppearance.h"
 
 class SettingsManager final : public QObject
 {
@@ -23,6 +24,8 @@ public:
     QString openAiModel() const;
     QByteArray windowGeometry() const;
     bool overlayClickThrough() const;
+    bool overlayExcludeFromCapture() const;
+    OverlayAppearance overlayAppearance() const;
     QRect captureRegion() const;
     QString captureScreen() const;
 
@@ -36,10 +39,14 @@ public:
     void notifyCredentialsChanged();
     void setWindowGeometry(const QByteArray &geometry);
     void setOverlayClickThrough(bool enabled);
+    void setOverlayExcludeFromCapture(bool enabled);
+    void setOverlayAppearance(OverlayAppearance appearance);
     void setCaptureRegion(const QRect &region, const QString &screenName);
 
 signals:
     void translationSettingsChanged();
+    void overlayAppearanceChanged();
+    void overlayCaptureExclusionChanged();
 
 private:
     QString readValidated(const QString &key,

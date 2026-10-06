@@ -2,6 +2,26 @@
 
 `Translator` 是一个基于 Qt 6、C++17 和 Qt Widgets 的实时屏幕文字识别与翻译程序。本项目参考 LunaTranslator 的架构和功能设计，但采用独立的 Qt 6/C++ 实现；原 LunaTranslator 源码保持独立且不受本工程影响。
 
+## Phase 7B.1 Capture Exclusion and Subtitle Appearance
+
+Settings now provides independent Translation/Original font sizes (10-72 pt),
+subtitle background opacity (0-100%), and Original/Translation visibility.
+At least one subtitle field stays enabled. Apply/OK persists these preferences;
+Cancel discards unapplied appearance drafts. These display settings do not restart
+OCR, recreate the translation backend, or stop realtime processing.
+
+Windows capture exclusion is enabled by default and reapplied after native handle
+or interaction-mode changes. It is **best effort, OS/capture API dependent**, not
+a security or DRM guarantee. Unsupported/failed calls leave the app usable.
+**API integration and automated appearance checks PASS; production screenshot
+exclusion is NOT VERIFIED:** this desktop returned all-black input even without
+the overlay, so ON/OFF capture acceptance must be repeated on a working desktop.
+The overlay-over-region limitation remains unresolved until that test passes.
+Release/Debug: **15/15 CTest suites PASS**. Real PP-OCRv6 Small + DeepL image-replay
+regression passed; this is not a new live-desktop or foreground-hotkey acceptance.
+See [Phase 7B.1 evidence and manual procedure](docs/overlay-capture-appearance-phase7b1.md).
+No new package or license/release work was performed.
+
 ## Phase 7A Overlay Interaction
 
 Windows defaults: **Ctrl+Alt+T** toggles mouse passthrough / Interactive;
@@ -19,8 +39,9 @@ PP-OCRv6 Small OCR and enabled translation while ClickThrough on a real Windows
 desktop. These are owner-reported results, not an agent-run desktop test.
 Windows 100%/150% DPI and multi-monitor remain pending / not tested.
 See [Phase 7A report and manual checks](docs/overlay-interaction-phase7a.md).
-Mouse passthrough does not exclude the overlay from screenshots. Phase 7B and
-public redistribution/licensing work remain deferred; no new portable package.
+Mouse passthrough is independent from capture exclusion. Phase 7B.1 adds the
+best-effort API and appearance controls described above; Phase 7B.2 and public
+redistribution/licensing work remain deferred; no new portable package.
 
 ## Phase 6.1C Portable Build Infrastructure
 

@@ -2,6 +2,7 @@
 
 #include <QWidget>
 #include "translator/TranslationTypes.h"
+#include "platform/WindowCaptureExclusion.h"
 
 class QCloseEvent;
 class QEnterEvent;
@@ -11,6 +12,7 @@ class QPoint;
 class QPushButton;
 class QResizeEvent;
 class QTimer;
+class QShowEvent;
 class SettingsDialog;
 class SettingsManager;
 class ICredentialStore;
@@ -23,7 +25,8 @@ class TranslationWindow final : public QWidget
 
 public:
     explicit TranslationWindow(SettingsManager &settings, QWidget *parent = nullptr,
-                               ICredentialStore *credentials = nullptr);
+                               ICredentialStore *credentials = nullptr,
+                               WindowCaptureExclusion::Backend captureBackend = {});
 
     void setTranslatedText(const QString &text);
     void setOriginalText(const QString &text);
@@ -32,6 +35,7 @@ public:
     void setTranslationRunning(bool running);
     void setInteractionMode(OverlayInteractionMode mode);
     OverlayInteractionMode interactionMode() const { return interactionMode_; }
+    WindowCaptureExclusion::Status captureExclusionStatus() const { return captureExclusion_.status(); }
 
 signals:
     void regionSelectionRequested();
@@ -39,6 +43,8 @@ signals:
     void stopRequested();
 
 protected:
+    bool event(QEvent *event) override;
+    void showEvent(QShowEvent *event) override;
     bool eventFilter(QObject *watched, QEvent *event) override;
     void enterEvent(QEnterEvent *event) override;
     void leaveEvent(QEvent *event) override;
@@ -54,8 +60,11 @@ private:
     void updateResizeCursor(Qt::Edges edges);
     void restoreWindowGeometry();
     bool isVisibleOnAnyScreen() const;
+    void applyAppearance();
+    void applyCaptureExclusion();
 
     SettingsManager &settings_;
+    WindowCaptureExclusion captureExclusion_;
     QWidget *toolbar_ = nullptr;
     QWidget *subtitleArea_ = nullptr;
     QPushButton *regionButton_ = nullptr;

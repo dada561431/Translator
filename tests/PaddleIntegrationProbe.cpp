@@ -32,7 +32,7 @@ int main(int argc, char **argv)
     app.setApplicationName(QStringLiteral("Translator"));
     const auto args = app.arguments();
     if (args.size() < 4) {
-        QTextStream(stderr) << "Usage: probe --batch|--live|--manual output.json image... [--deepl]\n";
+        QTextStream(stderr) << "Usage: probe --batch|--live|--manual|--replay output.json image... [--deepl] [--overlay-regression]\n";
         return 2;
     }
     SettingsManager productionSettings;
@@ -129,7 +129,8 @@ int main(int argc, char **argv)
         QTimer::singleShot(0, &app, next);
         return app.exec();
     }
-    if (args[1] != QLatin1String("--live") && args[1] != QLatin1String("--manual")) return 2;
+    const bool replay = args[1] == QLatin1String("--replay");
+    if (args[1] != QLatin1String("--live") && args[1] != QLatin1String("--manual") && !replay) return 2;
     auto *screen = QGuiApplication::primaryScreen();
     if (!screen || QGuiApplication::platformName() == QLatin1String("offscreen")) return 2;
     QLabel source;
@@ -142,7 +143,17 @@ int main(int argc, char **argv)
     TranslationWindow window(settings, nullptr, credentials.get());
     window.move(screen->availableGeometry().topLeft() + QPoint(100, 300));
     window.show();
-    RealtimePipelineCoordinator pipeline(settings, ocr, translation);
+    RealtimePipelineCoordinator::CaptureFunction replayInput;
+    if (replay) replayInput = [&](const QRect &region, const QString &screenName) {
+        CaptureResult input;
+        input.globalRect = region; input.screenName = screenName;
+        input.image = QImage(images[index]);
+        return input;
+    };
+    RealtimePipelineCoordinator pipeline(settings, ocr, translation, nullptr, replayInput);
+    const bool overlayRegression = args.contains(QStringLiteral("--overlay-regression"));
+    bool appearanceKeepsSession = true;
+    int clickThroughSamples = 0;
     QObject::connect(&window, &TranslationWindow::startRequested, &pipeline, [&] { pipeline.start(); });
     QObject::connect(&window, &TranslationWindow::stopRequested, &pipeline, &RealtimePipelineCoordinator::stop);
     QObject::connect(&pipeline, &RealtimePipelineCoordinator::runningChanged, &window, &TranslationWindow::setTranslationRunning);
@@ -167,6 +178,20 @@ int main(int argc, char **argv)
     QObject::connect(&pipeline, &RealtimePipelineCoordinator::sampleAccepted, &app,
         [&](quint64, quint64, const OcrResult &result, qint64 latency) {
             record(result, latency);
+            if (overlayRegression) {
+                if (window.interactionMode() == OverlayInteractionMode::ClickThrough) ++clickThroughSamples;
+                const auto session = pipeline.sessionId();
+                auto appearance = settings.overlayAppearance();
+                appearance.translationFontSize = 24 + index * 2;
+                appearance.originalFontSize = 16;
+                appearance.backgroundOpacity = 25 + index * 10;
+                appearance.showOriginal = index != 0;
+                appearance.showTranslation = index != 1;
+                settings.setOverlayAppearance(appearance);
+                window.setInteractionMode(OverlayInteractionMode::ClickThrough);
+                appearanceKeepsSession = appearanceKeepsSession && pipeline.isRunning()
+                    && pipeline.sessionId() == session;
+            }
             if (restarted) restartLatencyMs = result.elapsedMs;
             // Keep this frame stable long enough for its translation to return.
             QTimer::singleShot(5000, &app, [&, text = result.text] {
@@ -193,6 +218,13 @@ int main(int argc, char **argv)
                         const bool translationVisible = translated && !translations.isEmpty()
                             && translated->text() == translations.last().toObject().value("text").toString();
                         if (!originalVisible || (settings.translator() == "deepl" && !translationVisible)) ++failures;
+                        if (overlayRegression) {
+                            auto appearance = settings.overlayAppearance();
+                            appearance.showOriginal = true; appearance.showTranslation = true;
+                            settings.setOverlayAppearance(appearance);
+                            if (!appearanceKeepsSession || !original->isVisible() || !translated->isVisible()
+                                || clickThroughSamples < 2) ++failures;
+                        }
                         // Only this application's rendered subtitles, never the surrounding desktop.
                         if (!window.grab().save(args[2] + ".png")) ++failures;
                         finish({{"captures", qint64(pipeline.statistics().captures)},
@@ -200,6 +232,9 @@ int main(int argc, char **argv)
                             {"original_visible", originalVisible}, {"translation_visible", translationVisible},
                             {"restart_tested", restarted}, {"restart_same_pid", samePid},
                             {"restart_first_ocr_ms", restartLatencyMs},
+                            {"overlay_regression", overlayRegression},
+                            {"appearance_keeps_session", appearanceKeepsSession},
+                            {"clickthrough_samples", clickThroughSamples},
                             {"stop_halts_capture", captures == pipeline.statistics().captures}});
                     });
                 }

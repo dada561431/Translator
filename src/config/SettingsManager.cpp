@@ -3,6 +3,8 @@
 
 #include <QGuiApplication>
 #include <QScreen>
+#include <QFont>
+#include <cmath>
 
 namespace {
 
@@ -13,6 +15,20 @@ const QString kTranslatorKey = QStringLiteral("translator/provider");
 const QString kWindowGeometryKey = QStringLiteral("window/geometry");
 const QString kCaptureRegionKey = QStringLiteral("capture/region");
 const QString kCaptureScreenKey = QStringLiteral("capture/screen");
+
+qreal safeFont(qreal value, qreal fallback)
+{
+    return std::isfinite(value) ? qBound(10.0, value, 72.0) : fallback;
+}
+
+OverlayAppearance normalized(OverlayAppearance appearance)
+{
+    appearance.translationFontSize = safeFont(appearance.translationFontSize, 16);
+    appearance.originalFontSize = safeFont(appearance.originalFontSize, 12);
+    appearance.backgroundOpacity = qBound(0, appearance.backgroundOpacity, 100);
+    if (!appearance.showTranslation && !appearance.showOriginal) appearance.showTranslation = true;
+    return appearance;
+}
 
 const QString kDefaultSourceLanguage = QStringLiteral("auto");
 const QString kDefaultTargetLanguage = QStringLiteral("zh");
@@ -136,6 +152,54 @@ QByteArray SettingsManager::windowGeometry() const
 bool SettingsManager::overlayClickThrough() const
 {
     return settings_.value(QStringLiteral("overlay/clickThrough"), false).toBool();
+}
+
+bool SettingsManager::overlayExcludeFromCapture() const
+{
+#ifdef Q_OS_WIN
+    constexpr bool defaultValue = true;
+#else
+    constexpr bool defaultValue = false;
+#endif
+    return settings_.value(QStringLiteral("overlay/excludeFromCapture"), defaultValue).toBool();
+}
+
+OverlayAppearance SettingsManager::overlayAppearance() const
+{
+    OverlayAppearance appearance;
+    const qreal base = QGuiApplication::font().pointSizeF();
+    auto readFont = [this](const QString &key, qreal fallback) {
+        bool ok = false;
+        const qreal value = settings_.value(key, fallback).toDouble(&ok);
+        return ok ? safeFont(value, fallback) : fallback;
+    };
+    appearance.translationFontSize = readFont(QStringLiteral("overlay/translationFontSize"), qMax(16.0, base + 6.0));
+    appearance.originalFontSize = readFont(QStringLiteral("overlay/originalFontSize"), qMax(12.0, base + 2.0));
+    appearance.backgroundOpacity = settings_.value(QStringLiteral("overlay/backgroundOpacity"), 0).toInt();
+    appearance.showTranslation = settings_.value(QStringLiteral("overlay/showTranslation"), true).toBool();
+    appearance.showOriginal = settings_.value(QStringLiteral("overlay/showOriginal"), true).toBool();
+    return normalized(appearance);
+}
+
+void SettingsManager::setOverlayExcludeFromCapture(bool enabled)
+{
+    const bool changed = overlayExcludeFromCapture() != enabled;
+    settings_.setValue(QStringLiteral("overlay/excludeFromCapture"), enabled);
+    settings_.sync();
+    if (changed) emit overlayCaptureExclusionChanged();
+}
+
+void SettingsManager::setOverlayAppearance(OverlayAppearance appearance)
+{
+    appearance = normalized(appearance);
+    const bool changed = !(overlayAppearance() == appearance);
+    settings_.setValue(QStringLiteral("overlay/translationFontSize"), appearance.translationFontSize);
+    settings_.setValue(QStringLiteral("overlay/originalFontSize"), appearance.originalFontSize);
+    settings_.setValue(QStringLiteral("overlay/backgroundOpacity"), appearance.backgroundOpacity);
+    settings_.setValue(QStringLiteral("overlay/showTranslation"), appearance.showTranslation);
+    settings_.setValue(QStringLiteral("overlay/showOriginal"), appearance.showOriginal);
+    settings_.sync();
+    if (changed) emit overlayAppearanceChanged();
 }
 
 void SettingsManager::setOverlayClickThrough(bool enabled)

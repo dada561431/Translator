@@ -12,6 +12,14 @@ set(CMAKE_AUTORCC ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network)
 
+add_library(TranslatorOverlayPlatform STATIC
+    src/platform/WindowCaptureExclusion.h src/platform/WindowCaptureExclusion.cpp)
+target_include_directories(TranslatorOverlayPlatform PUBLIC src)
+target_link_libraries(TranslatorOverlayPlatform PUBLIC Qt6::Widgets)
+if(WIN32)
+    target_link_libraries(TranslatorOverlayPlatform PRIVATE user32)
+endif()
+
 set(OVERLAY_INTERACTION_SOURCES
     src/app/GlobalShortcutManager.h src/app/GlobalShortcutManager.cpp
     src/app/OverlayInteractionController.h src/app/OverlayInteractionController.cpp
@@ -89,6 +97,7 @@ add_executable(Translator
 target_include_directories(Translator PRIVATE src)
 
 target_link_libraries(Translator PRIVATE
+    TranslatorOverlayPlatform
     TranslatorProviders
     Qt6::Core
     Qt6::Gui
@@ -106,6 +115,25 @@ set_target_properties(Translator PROPERTIES
 include(CTest)
 
 if(BUILD_TESTING)
+    add_executable(TranslatorPhase7BTests
+        tests/Phase7CaptureAppearanceTest.cpp
+        src/config/SettingsManager.cpp src/config/SettingsManager.h
+        src/gui/SettingsDialog.cpp src/gui/SettingsDialog.h
+        src/gui/TranslationWindow.cpp src/gui/TranslationWindow.h
+        ${REALTIME_SOURCES} ${TRANSLATION_SOURCES}
+        src/app/OcrCoordinator.cpp src/app/OcrCoordinator.h
+        src/capture/ScreenCaptureService.cpp)
+    target_include_directories(TranslatorPhase7BTests PRIVATE src)
+    target_link_libraries(TranslatorPhase7BTests PRIVATE TranslatorProviders TranslatorOverlayPlatform)
+    add_test(NAME phase7b1_capture_appearance COMMAND TranslatorPhase7BTests)
+    set_tests_properties(phase7b1_capture_appearance PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+    add_executable(TranslatorCaptureExclusionProbe tests/CaptureExclusionProbe.cpp
+        src/config/SettingsManager.cpp src/config/SettingsManager.h
+        src/gui/SettingsDialog.cpp src/gui/SettingsDialog.h
+        src/gui/TranslationWindow.cpp src/gui/TranslationWindow.h
+        src/capture/ScreenCaptureService.cpp)
+    target_include_directories(TranslatorCaptureExclusionProbe PRIVATE src)
+    target_link_libraries(TranslatorCaptureExclusionProbe PRIVATE TranslatorProviders TranslatorOverlayPlatform)
     add_executable(TranslatorPhase7Tests
         tests/Phase7OverlayTest.cpp ${OVERLAY_INTERACTION_SOURCES}
         src/config/SettingsManager.cpp src/config/SettingsManager.h
@@ -341,4 +369,8 @@ if(BUILD_TESTING)
     )
     target_include_directories(TranslatorScreenOcrProbe PRIVATE src)
     target_link_libraries(TranslatorScreenOcrProbe PRIVATE Qt6::Core Qt6::Gui)
+    foreach(target TranslatorPhase7Tests TranslatorPaddleProbe TranslatorPhase61Tests
+            TranslatorPhase51Tests TranslatorPhase5Tests TranslatorPhase2Tests TranslatorPhase4Tests)
+        target_link_libraries(${target} PRIVATE TranslatorOverlayPlatform)
+    endforeach()
 endif()

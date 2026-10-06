@@ -22,6 +22,9 @@
 #include <QTimer>
 #include <QVBoxLayout>
 #include <QWindow>
+#include <QShowEvent>
+#include <QDebug>
+#include <utility>
 
 namespace {
 
@@ -38,10 +41,12 @@ QGraphicsDropShadowEffect *createSubtitleShadow(QObject *parent, int blurRadius)
 
 } // namespace
 
-TranslationWindow::TranslationWindow(SettingsManager &settings, QWidget *parent, ICredentialStore *credentials)
+TranslationWindow::TranslationWindow(SettingsManager &settings, QWidget *parent, ICredentialStore *credentials,
+                                     WindowCaptureExclusion::Backend captureBackend)
     : QWidget(parent,
               Qt::Window | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint)
     , settings_(settings)
+    , captureExclusion_(std::move(captureBackend))
 {
     setObjectName(QStringLiteral("translationWindow"));
     setWindowTitle(QStringLiteral("Translator"));
@@ -57,7 +62,62 @@ TranslationWindow::TranslationWindow(SettingsManager &settings, QWidget *parent,
     originalLabel_->setText(tr("Original text appears here"));
 
     settingsDialog_ = new SettingsDialog(settings_, this, credentials);
+    connect(&settings_, &SettingsManager::overlayAppearanceChanged, this, &TranslationWindow::applyAppearance);
+    connect(&settings_, &SettingsManager::overlayCaptureExclusionChanged, this, &TranslationWindow::applyCaptureExclusion);
+    applyAppearance();
     restoreWindowGeometry();
+}
+
+void TranslationWindow::applyAppearance()
+{
+    const auto appearance = settings_.overlayAppearance();
+    QFont translated = translatedLabel_->font(), original = originalLabel_->font();
+    translated.setPointSizeF(appearance.translationFontSize);
+    original.setPointSizeF(appearance.originalFontSize);
+    translatedLabel_->setFont(translated);
+    originalLabel_->setFont(original);
+    translatedLabel_->setVisible(appearance.showTranslation);
+    originalLabel_->setVisible(appearance.showOriginal);
+    subtitleArea_->setStyleSheet(QStringLiteral("#subtitleArea { background-color: rgba(28,30,33,%1); }")
+                                    .arg(qRound(255.0 * appearance.backgroundOpacity / 100.0)));
+    const int contentHeight = (appearance.showTranslation ? translatedLabel_->fontMetrics().height() : 0)
+        + (appearance.showOriginal ? originalLabel_->fontMetrics().height() : 0)
+        + (appearance.showOriginal && appearance.showTranslation ? 5 : 0) + 30;
+    setMinimumSize(420, qMax(120, contentHeight));
+    updateGeometry();
+}
+
+void TranslationWindow::applyCaptureExclusion()
+{
+    const auto previous = captureExclusion_.status();
+    captureExclusion_.setExcluded(this, settings_.overlayExcludeFromCapture());
+    const auto status = captureExclusion_.status();
+    const bool unavailable = status == WindowCaptureExclusion::Status::Unsupported
+        || status == WindowCaptureExclusion::Status::Failed;
+    if (settingsDialog_) settingsDialog_->setCaptureExclusionAvailable(!unavailable && captureExclusion_.supported());
+    if (unavailable && status != previous) {
+        interactionFeedback_->setText(tr("Capture exclusion unavailable"));
+        interactionFeedback_->adjustSize();
+        interactionFeedback_->move((width() - interactionFeedback_->width()) / 2,
+                                   toolbar_->geometry().bottom() + 4);
+        interactionFeedback_->show();
+        interactionFeedback_->raise();
+        interactionFeedbackTimer_->start();
+        qWarning().noquote() << "[CaptureExclusion]" << captureExclusion_.lastError();
+    }
+}
+
+bool TranslationWindow::event(QEvent *event)
+{
+    const bool handled = QWidget::event(event);
+    if (event->type() == QEvent::WinIdChange && settingsDialog_) applyCaptureExclusion();
+    return handled;
+}
+
+void TranslationWindow::showEvent(QShowEvent *event)
+{
+    QWidget::showEvent(event);
+    applyCaptureExclusion();
 }
 
 void TranslationWindow::setInteractionMode(OverlayInteractionMode mode)
@@ -80,6 +140,7 @@ void TranslationWindow::setInteractionMode(OverlayInteractionMode mode)
     setGeometry(previousGeometry);
     toolbar_->setVisible(!clickThrough);
     if (wasVisible) show();
+    applyCaptureExclusion();
     if (settingsVisible) settingsDialog_->show();
     if (!clickThrough) {
         toolbarHideTimer_->start(1000);

@@ -2,6 +2,7 @@
 #include "config/SettingsManager.h"
 #include "translator/TranslationProviderRegistry.h"
 #include "translator/OpenAiCompatibleTranslator.h"
+#include "platform/WindowCaptureExclusion.h"
 
 #include <QCheckBox>
 #include <QComboBox>
@@ -14,6 +15,8 @@
 #include <QShowEvent>
 #include <QSignalBlocker>
 #include <QVBoxLayout>
+#include <QDoubleSpinBox>
+#include <QSpinBox>
 
 SettingsDialog::SettingsDialog(SettingsManager &settings, QWidget *parent, ICredentialStore *credentials)
     : QDialog(parent), settings_(settings)
@@ -107,6 +110,38 @@ void SettingsDialog::createUi()
     privacyLabel_ = new QLabel(tr("识别出的文字将发送至所选翻译服务。"), this);
     privacyLabel_->setWordWrap(true);
     layout->addWidget(privacyLabel_);
+    auto *overlayForm = new QFormLayout();
+    translationFontSize_ = new QDoubleSpinBox(this);
+    translationFontSize_->setObjectName(QStringLiteral("translationFontSizeSpin"));
+    originalFontSize_ = new QDoubleSpinBox(this);
+    originalFontSize_->setObjectName(QStringLiteral("originalFontSizeSpin"));
+    for (auto *spin : {translationFontSize_, originalFontSize_}) {
+        spin->setRange(10, 72);
+        spin->setDecimals(1);
+        spin->setSuffix(tr(" pt"));
+    }
+    backgroundOpacity_ = new QSpinBox(this);
+    backgroundOpacity_->setObjectName(QStringLiteral("backgroundOpacitySpin"));
+    backgroundOpacity_->setRange(0, 100);
+    backgroundOpacity_->setSuffix(QStringLiteral(" %"));
+    showTranslation_ = new QCheckBox(tr("Show Translation"), this);
+    showTranslation_->setObjectName(QStringLiteral("showTranslationCheck"));
+    showOriginal_ = new QCheckBox(tr("Show Original"), this);
+    showOriginal_->setObjectName(QStringLiteral("showOriginalCheck"));
+    excludeFromCapture_ = new QCheckBox(tr("Exclude subtitle overlay from screen capture"), this);
+    excludeFromCapture_->setObjectName(QStringLiteral("excludeFromCaptureCheck"));
+    captureExclusionNote_ = new QLabel(this);
+    captureExclusionNote_->setObjectName(QStringLiteral("captureExclusionNote"));
+    captureExclusionNote_->setWordWrap(true);
+    overlayForm->addRow(tr("Translation font size"), translationFontSize_);
+    overlayForm->addRow(tr("Original font size"), originalFontSize_);
+    overlayForm->addRow(tr("Subtitle background opacity"), backgroundOpacity_);
+    overlayForm->addRow(showTranslation_);
+    overlayForm->addRow(showOriginal_);
+    overlayForm->addRow(excludeFromCapture_);
+    overlayForm->addRow(captureExclusionNote_);
+    layout->addLayout(overlayForm);
+    setCaptureExclusionAvailable(WindowCaptureExclusion::platformSupported());
     errorLabel_ = new QLabel(this);
     errorLabel_->setObjectName(QStringLiteral("credentialError"));
     errorLabel_->setWordWrap(true);
@@ -136,11 +171,40 @@ void SettingsDialog::loadSettings()
                            ? QStringLiteral("pro") : QStringLiteral("free"));
     baseUrlEdit_->setText(settings_.openAiBaseUrl());
     modelEdit_->setText(settings_.openAiModel());
+    loadOverlaySettings();
     updateProvider();
+}
+
+void SettingsDialog::loadOverlaySettings()
+{
+    const auto appearance = settings_.overlayAppearance();
+    const QSignalBlocker translation(showTranslation_), original(showOriginal_);
+    translationFontSize_->setValue(appearance.translationFontSize);
+    originalFontSize_->setValue(appearance.originalFontSize);
+    backgroundOpacity_->setValue(appearance.backgroundOpacity);
+    showTranslation_->setChecked(appearance.showTranslation);
+    showOriginal_->setChecked(appearance.showOriginal);
+    excludeFromCapture_->setChecked(settings_.overlayExcludeFromCapture());
+    updateVisibilityChecks();
+}
+
+void SettingsDialog::updateVisibilityChecks()
+{
+    showTranslation_->setEnabled(showOriginal_->isChecked());
+    showOriginal_->setEnabled(showTranslation_->isChecked());
+}
+
+void SettingsDialog::setCaptureExclusionAvailable(bool available)
+{
+    excludeFromCapture_->setEnabled(available);
+    captureExclusionNote_->setText(available ? tr("Best-effort Windows capture exclusion.")
+                                           : tr("Capture exclusion unavailable"));
 }
 
 void SettingsDialog::connectSettings()
 {
+    connect(showTranslation_, &QCheckBox::toggled, this, &SettingsDialog::updateVisibilityChecks);
+    connect(showOriginal_, &QCheckBox::toggled, this, &SettingsDialog::updateVisibilityChecks);
     connect(sourceLanguageCombo_, &QComboBox::currentIndexChanged, this, [this](int index) {
         settings_.setSourceLanguage(sourceLanguageCombo_->itemData(index).toString());
     });
@@ -245,9 +309,16 @@ bool SettingsDialog::applyCredentials()
         drafts_.remove(id);
         if (changed) settings_.notifyCredentialsChanged();
     }
-    if (info && info->supportsPlan) settings_.setDeepLPlan(planCombo_->currentData().toString());
-    settings_.setOpenAiBaseUrl(baseUrlEdit_->text());
-    settings_.setOpenAiModel(modelEdit_->text());
+    // Plan already saves on explicit combo changes. An appearance-only Apply
+    // must not materialize absent provider keys and invalidate the pipeline.
+    if (baseUrlEdit_->text().trimmed() != settings_.openAiBaseUrl())
+        settings_.setOpenAiBaseUrl(baseUrlEdit_->text());
+    if (modelEdit_->text().trimmed() != settings_.openAiModel())
+        settings_.setOpenAiModel(modelEdit_->text());
+    settings_.setOverlayAppearance({translationFontSize_->value(), originalFontSize_->value(),
+        backgroundOpacity_->value(), showTranslation_->isChecked(), showOriginal_->isChecked()});
+    if (excludeFromCapture_->isEnabled())
+        settings_.setOverlayExcludeFromCapture(excludeFromCapture_->isChecked());
     const QSignalBlocker blocker(apiKeyEdit_);
     apiKeyEdit_->clear();
     updateProvider();
@@ -266,6 +337,7 @@ void SettingsDialog::clearDrafts()
 void SettingsDialog::reject()
 {
     clearDrafts();
+    loadOverlaySettings();
     QDialog::reject();
 }
 
