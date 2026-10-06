@@ -4,19 +4,28 @@
 
 ## Phase 6.1C Portable Build Infrastructure
 
-**Portable acceptance is pending, not fully verified.** A local Windows x64
-draft is generated at `dist/TranslatorPortable/`. The selected layout contains
+**Technical portable acceptance: PASS. Clean Windows acceptance: PASS.
+Physically offline OCR acceptance: PASS. Release redistribution gate: still
+blocked by OWNER REVIEW REQUIRED.** A Windows x64 technical candidate is generated
+at `dist/TranslatorPortable/`. The selected layout contains
 app-local Python, fixed Paddle packages and the verified small models, with Qt
 DLLs/plugins deployed by `windeployqt`. Development overrides remain supported.
 
 Release/Debug builds and 13/13 CTest suites pass. Local minimal-PATH OCR,
 Unicode/space model paths (with verified user-cache staging), read-only install
-directory, real desktop capture and Stop/Start helper reuse were tested. However,
-the regenerated candidate now includes hash-pinned, officially signed Microsoft
+directory, real desktop capture and Stop/Start helper reuse were tested. The
+regenerated candidate now includes hash-pinned, officially signed Microsoft
 VC runtime inputs and passes the 262-binary PE audit with zero missing candidates.
-Clean-machine/disconnected-network acceptance and
-full redistribution-license review are outstanding. Do not distribute this
-draft as a verified self-contained release. No zip or installer is produced.
+The owner manually verified the candidate after copying it into a clean Windows
+Sandbox local directory with Networking=Disable: GUI/PP-OCRv6 Small, Region -> Start,
+20/20 self-check, warm Stop/Start and Close cleanup passed, with Provider None and no
+model downloads. These are owner-reported results, not a new agent-run Sandbox test.
+Direct execution from the read-only host-mapped PortableInput folder once timed out
+during helper startup; this is a **non-blocking Windows Sandbox host-mapped-folder
+limitation**, not a fixed issue. Run the Sandbox local copy; production timeout is unchanged.
+Qt and VC runtime redistribution remain **OWNER REVIEW REQUIRED**, and other license
+review remains outstanding. Do not declare public-release ready. No public release
+ZIP/SHA256 or installer is produced.
 
 The portable draft explicitly does **not** bundle Tesseract; selecting it reports
 unavailable instead of borrowing the development machine's installation.

@@ -2,34 +2,41 @@
 
 ## Acceptance Status
 
-Phase 6.1C is **not fully complete**. Packaging infrastructure is implemented
-and locally exercised, but the generated folder is a **technical draft**, not a
-verified redistributable release. Do not distribute or label it fully portable.
+Technical portable acceptance: **PASS**. Clean Windows acceptance: **PASS**.
+Physically offline OCR acceptance: **PASS**. Release redistribution gate: **still
+blocked by OWNER REVIEW REQUIRED**. Phase 6.1C is not fully complete as a public
+release; technical acceptance does not grant redistribution clearance.
 
 Current final-acceptance evidence (2026-10-06) is in
 [the 75-point release-gate report](windows-portable-final-acceptance.md).
 The historical implementation evidence below is retained, not substituted for
 new candidate measurements.
 
-Outstanding gates:
+Current evidence and remaining release gates:
 
 - The regenerated candidate passes static candidate-presence audit: 262 PE files,
   zero missing dependencies. Microsoft 14.51.36247.0 app-local DLLs are extracted
   from the official signed EXE, hash-pinned and loaded from the candidate in real
   import tests. mkldnn.dll is retained; MKL-DNN remains disabled. This static audit
   is not a clean Windows loader proof or a redistribution clearance.
-- No clean Windows VM, Sandbox or second PC was available. Minimal PATH and
-  relocation on this developer machine are not clean-machine acceptance.
-- Actual disconnected-network acceptance remains pending. Offline flags and
-  local-model loading were tested, but network connectivity was not disabled.
+- The owner subsequently reported manual clean Windows Sandbox acceptance from
+  a guest-local copy: GUI/PP-OCRv6 Small, Region -> Start, 20/20 self-check, warm
+  Stop/Start and Close cleanup PASS. PID 5964; first request 7332 ms; warm median
+  155 ms, mean 160 ms, >300 ms 0. This is owner-reported evidence, not a new agent run.
+- Sandbox Networking=Disable provided real disconnected OCR; no model download
+  occurred. Clean Windows / Physically offline OCR / Portable local execution PASS.
 - Redistribution review remains pending: Qt acquisition/applicable terms and
   VC owner entitlement remain OWNER REVIEW REQUIRED. Model-specific official
   cards/Apache text and matching weight identity are recorded; native-library
   obligations remain REVIEW REQUIRED. See the actual shipped license inventory.
 - One read-only Unicode-path self-check timed out at 30,106 ms on helper startup.
   A later same-candidate run passed 20/20 and warm Stop/Start; root cause is not
-  established and the failure is not declared fixed. Clean first-launch verification
-  must retain this observation, not cherry-pick the passing rerun.
+  established and the failure is not declared fixed. That historical observation
+  remains separate from the later owner-reported Sandbox local-copy PASS.
+- Direct execution from Sandbox read-only host-mapped PortableInput once hit an
+  approximately 30-second startup timeout, while the same guest-local candidate
+  passed GUI/OCR/20 self-checks. This is a **Non-blocking Windows Sandbox
+  host-mapped-folder limitation**, not fixed; production timeout is unchanged.
 
 No installer or release zip was produced. No security controls were disabled.
 The no-subtitle false positive remains a Known Limitation; filtering is deferred.
@@ -55,8 +62,8 @@ Build-only pip/PyInstaller/hooks/pefile tools are excluded from the runtime.
 The selected helper is `paddle_helper.py`, launched with bundled `python.exe`.
 It is not a venv: no pyvenv.cfg, external base interpreter, pip, registry search,
 user site or development checkout is used by its isolated `python312._pth`.
-Full clean-machine proof is still pending; resolving the static CRT gate does not
-replace executing the complete candidate on a clean Windows host.
+Clean Windows and offline local-copy execution subsequently passed in the owner's
+manual Sandbox test. Static CRT evidence remains distinct from that reported run.
 
 ## Layout and Launch
 
@@ -222,7 +229,7 @@ its static candidate-presence audit is explicitly not a Windows loader proof.
 Smoke uses minimal System32 PATH, invalid PYTHONHOME/PYTHONPATH, non-checkout cwd,
 real app self-check and helper cleanup, then revalidates package immutability.
 
-## Clean-machine Acceptance Still Required
+## Historical Clean-machine Checklist (See Current Owner-reported PASS Above)
 
 Once licensed native inputs/notices are complete and the static audit passes:
 copy the folder to a clean Windows x64 VM/PC with no Python/Qt/Paddle/dev CRTs.
