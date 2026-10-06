@@ -12,17 +12,26 @@ translation, subtitle display, audio Settings UI, model downloads or packaging.
 The Translator executable does not link TranslatorAudio or construct an audio input.
 No startup microphone/loopback acquisition, persistent settings or recordings.
 
-**Phase 8A: PARTIAL. Core Acceptance not yet PASS.** Device opening/nonzero PCM
-alone is not proof of intelligible voice or a speaking/quiet comparison.
+Implementation commit: `3656ea0b0cda6023ca40651e790f5f03b21a3caa`.
+
+**Phase 8A Core Acceptance: PASS.** The owner subsequently completed a real Windows
+microphone speaking/quiet test with a clear level difference, recorded below.
+This is owner-reported manual evidence, not a new agent-run capture or ASR claim.
+The closeout changes only this document and README; production code is unchanged.
+Existing Release/Debug PASS and CTest 19/19 PASS in each configuration are reused
+without rerunning builds/tests. Physical microphone unplug, real default-output
+switching and Windows microphone privacy denial remain non-blocking PENDING / NOT TESTED.
 
 | Acceptance | Status | Evidence boundary |
 | --- | --- | --- |
 | Independent module, converter and coordinator | PASS | Release/Debug and device-independent tests |
 | Microphone API capture / PCM / repeated Start-Stop | PASS | Actual Windows QAudioSource, 20 cycles |
-| Microphone voice versus quiet | PENDING | Owner reported completing speaking/quiet attempts; observed default external-mic levels did not establish a clear difference |
-| Microphone Capture (full real voice acceptance) | PENDING | Not inferred from loopback success or low-level nonzero microphone PCM |
+| Microphone voice versus quiet | PASS (owner-reported) | Subsequent real Realtek microphone speaking/quiet test has a clear peak difference; full data below |
+| Microphone Capture (full real voice acceptance) | PASS (owner-reported) | Real voice enters microphone path; independent of loopback evidence |
 | Windows System Loopback Capture | PASS | Actual render endpoint, explicit silence/tone/silence fixture; no microphone backend in loopback Probe |
-| Physical unplug / default-device change | PENDING / NOT TESTED | Fake errors/state recovery pass; real device manipulation not performed |
+| Physical microphone unplug | PENDING / NOT TESTED | Fake errors/state recovery pass; no real unplug reported; non-blocking |
+| Real default-output switching | PENDING / NOT TESTED | No real output switch reported; non-blocking |
+| Windows microphone privacy-denial scenario | PENDING / NOT TESTED | No real permission-denial test reported; non-blocking |
 | Five-minute stability | PASS | Each real backend completed its own 300-second run |
 | Phase 7 regressions | PASS (automated) | All existing suites retained; no new full desktop manual Phase 7 claim |
 
@@ -203,7 +212,8 @@ AudioBackendTest exercises the real Windows adapter's invalid-endpoint failure,
 ensures fatal Error is not preceded by ordinary Stopped, preserves coordinator
 diagnostics and repeats Stop during startup 20 times. The invalid ID never opens
 hardware; a microphone/render device or playback is not required by this suite.
-Final Release and Debug build/CTest results: **PASS, 19/19 suites in each**.
+Existing implementation Release and Debug build/CTest results: **PASS, 19/19 suites in each**.
+These results are not rerun for this documentation-only manual acceptance closeout.
 All previous 16 suites remain and pass. The initial MinGW GUID linker errors and
 ambiguous Probe CLI initializer were fixed before final builds. The real invalid-ID
 negative probe exposed a fatal stopped-before-error ordering bug; teardown now
@@ -258,10 +268,48 @@ Unified output: **16000 Hz / mono / int16 LE / 640 bytes per chunk**.
 
 Initial 12-second mic check: 599 chunks, 191680 samples, 383360 bytes, 184230 nonzero,
 7450 zero, peak 0.00604248, RMS 0.00122200, start 124 ms, Stop 17.661 ms; valid chunks.
-Owner twice reported completing speaking/quiet attempts. The subsequent default
-external-mic run remained near noise level, so human voice/quiet acceptance is
-**PENDING**, not a fabricated PASS. Selecting the intended internal/headset microphone
-and repeating the controlled speaking/quiet check is the remaining core action.
+Historical agent-run default external-mic checks remained near noise level despite
+the owner's two earlier speaking/quiet attempts. Those checks alone did not establish
+voice/quiet acceptance and are not retroactively relabeled. The later independent
+owner-reported Realtek microphone test below supplies the missing manual evidence.
+
+### Owner-Reported Microphone Speaking / Quiet Acceptance
+
+The owner completed this test in a real Windows environment using **Realtek(R)
+Audio microphone**, speaking first, then remaining quiet. No specific endpoint ID
+is supplied for this later test; it is not assumed to be the earlier default external mic.
+
+Native format: **48000 Hz / 2 channels / float32 LE**.
+Unified PCM: **16000 Hz / mono / int16 LE / 20 ms / 640 bytes**.
+Reported Probe level peaks, in order:
+
+```text
+0.0050354
+0.0154114
+0.0012207
+0.0000305
+```
+
+| Reported summary field | Value |
+| --- | --- |
+| peak | 0.015411376953125 |
+| rms | 0.00036135544829396954 |
+| chunks | 249 |
+| samples | 79680 |
+| dropped_chunks | 0 |
+| invalid_chunk | false |
+| stopped | true |
+
+The owner confirms that the speaking-to-quiet peak difference is clear enough to
+establish real voice input through the microphone capture path. **Microphone voice
+versus quiet: PASS. Microphone Capture: PASS.** This is capture acceptance, not a
+claim of speech recognition, intelligibility measurement or ASR accuracy.
+Windows System Loopback Capture remains independently PASS on its existing evidence;
+combined with the existing build/test/lifecycle results, **Phase 8A Core Acceptance
+is PASS**. Physical microphone unplug, real default-output switching and the Windows
+microphone privacy-denial scenario remain PENDING / NOT TESTED and non-blocking.
+
+### Earlier Loopback and Repeated-Cycle Evidence
 
 Initial loopback silence/tone/silence: 399 chunks, 127680 samples, 255360 bytes,
 55107 nonzero, 72573 zero, peak 0.234833, RMS 0.0867078, start 20 ms, Stop 12.052 ms.
@@ -321,8 +369,8 @@ foundation is not prematurely wired into the production overlay.
 
 ## Remaining Limitations and Phase 8B Boundary
 
-- Full microphone voice/quiet acceptance pending despite capture API success.
-- Physical unplug, default output switch and privacy-denial scenarios not tested.
+- Physical microphone unplug, real default-output switching and Windows microphone
+  privacy-denial scenarios remain PENDING / NOT TESTED; non-blocking for Core Acceptance.
 - Non-Windows microphone build/runtime not validated; loopback explicitly unsupported.
 - Linear resampling is not anti-aliased; multichannel downmix is unweighted.
 - Endpoint idle packets may stop arriving; no wall-clock silence synthesis.
@@ -338,7 +386,7 @@ is included here. Do not begin Phase 8B without a separately scoped request.
 
 ## Requested Report Ledger
 
-1. Phase 8A PARTIAL; full microphone voice/quiet acceptance pending.
+1. Phase 8A Core Acceptance PASS, with subsequent owner-reported voice/quiet evidence.
 2. Initial commit e5f5259166859f613cee78a9fdd1bf095c056ba9.
 3. Modified CMakeLists.txt, .gitignore and README.md only outside new audio files.
 4. Added src/audio/{AudioInputTypes,IAudioInput,AudioChunkBuffer,PcmConverter,
@@ -356,9 +404,9 @@ is included here. Do not begin Phase 8B without a separately scoped request.
 13. QMediaDevices, QAudioDevice, QAudioSource, QAudioFormat, QMicrophonePermission.
 14. Two actual microphones enumerated with byte IDs/default flags.
 15. Actual source format 48 kHz stereo float32 LE.
-16. Actual opening/streaming PASS; full microphone voice acceptance PENDING.
-17. Nonzero microphone PCM YES; does not prove voice rather than noise.
-18. Speaking/quiet distinction PENDING; observed default external-mic peak low.
+16. Actual opening/streaming PASS; full microphone voice acceptance PASS in later owner report.
+17. Nonzero microphone PCM YES; later controlled speaking/quiet test confirms real voice input.
+18. Speaking/quiet distinction PASS in owner report; earlier low external-mic evidence retained separately.
 19. Microphone 20/20 real Start-Stop cycles PASS, plus fake repeated cycles.
 20. Physical microphone disconnect PENDING; fake loss/restart PASS.
 21. Windows shared-mode event-driven render-endpoint loopback.
@@ -390,9 +438,9 @@ is included here. Do not begin Phase 8B without a separately scoped request.
 47. Local CLI QA Probe with kind/device/duration/cycles/tone/active-exit options.
 48. No WAV/PCM recorded or committed; metadata reports only in ignored .cache/.
 49. Three new suites: converter, coordinator and native failure cleanup.
-50. Final CTest Release 19/19 PASS and Debug 19/19 PASS, all old suites retained.
-51. Windows MinGW Release build PASS.
-52. Windows MinGW Debug build PASS.
+50. Existing CTest Release 19/19 PASS and Debug 19/19 PASS; no rerun in this closeout.
+51. Existing Windows MinGW Release build PASS; no rerun.
+52. Existing Windows MinGW Debug build PASS; no rerun.
 53. Existing OCR source unchanged.
 54. Paddle/helper/protocol source unchanged.
 55. Realtime OCR scheduler/source unchanged.
@@ -409,8 +457,8 @@ is included here. Do not begin Phase 8B without a separately scoped request.
 66. Commit hash supplied in final response (not self-embedded in its own commit).
 67. Actual non-force origin/main push outcome supplied in final response.
 68. Original LunaTranslator read-only; status checked before commit.
-69. Microphone Capture final status PENDING for full real voice acceptance.
+69. Microphone Capture final status PASS based on owner's real speaking/quiet test.
 70. Windows System Loopback Capture PASS independently.
-71. Phase 8A Core Acceptance PENDING / overall PARTIAL, not PASS.
+71. Phase 8A Core Acceptance PASS; physical unplug/output switching/privacy denial remain non-blocking pending.
 72. Remaining limitations enumerated above; real device/voice checks not invented.
 73. Phase 8B only consumes bounded PCM and lifecycle/session metadata; no ASR work begun.

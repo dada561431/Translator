@@ -10,10 +10,13 @@ explicit Start/Stop, bounded delivery and session-safe cleanup. No automatic
 capture on application startup, no ASR, no OCR/translation/subtitle integration.
 Acceptance is tracked separately for microphone and loopback; see
 [Phase 8A architecture and evidence](docs/audio-input-phase8a.md).
-Current Phase 8A status: **PARTIAL**. System Loopback Capture PASS; full microphone
-voice/quiet acceptance PENDING despite successful PCM capture and lifecycle checks.
-Release/Debug and **19/19 CTest suites** PASS; both backends passed five-minute
-stability and 20-cycle Start/Stop probes. Physical device-change checks remain pending.
+**Phase 8A Core Acceptance: PASS.** Microphone Capture and voice/quiet acceptance
+PASS based on the owner's subsequent real Windows test; System Loopback Capture
+remains independently PASS. Existing Release/Debug and **19/19 CTest suites** PASS;
+both backends passed five-minute stability and 20-cycle Start/Stop probes. This
+documentation-only closeout does not rerun builds/tests. Physical microphone unplug,
+real default-output switching and Windows microphone privacy-denial checks remain
+PENDING / NOT TESTED, non-blocking for Core Acceptance. Phase 8B is not started.
 
 ## Phase 7B.2 Overlay Controls
 
