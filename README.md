@@ -15,12 +15,16 @@ and Exit. Hiding affects only the overlay, not OCR/translation. Double-click res
 Show + Interactive. Close still exits; hidden Region selection restores the previous
 visibility. Notification-area unavailability keeps the window recoverable.
 
-Implementation and automated regression PASS: Release/Debug **16/16 CTest suites**.
-Real PP-OCRv6 Small replay with hidden/locked overlay and warm restart passes.
-Controlled native shortcut-conflict rollback passes. This desktop already owns
-Ctrl+Alt+S elsewhere (Win32 1409); configure another key or use the toolbar/tray.
-Full new-control desktop acceptance, DPI and multi-monitor remain pending.
-This round's real DeepL calls timed out (HTTP 0), so live DeepL is not marked PASS.
+**Phase 7B.2 Core Acceptance: PASS**, based on owner-reported real Windows desktop
+tests of drag lock/unlock, independent ClickThrough state, persistent custom
+foreground global shortcuts, all tray commands and tray Interactive recovery.
+Hidden-overlay realtime processing continues; Show displays the latest subtitles.
+Exit leaves no observed Translator/helper residual, and capture exclusion/appearance
+have no observed regression. Existing Release/Debug builds PASS and **16/16 CTest
+suites PASS** in each configuration; this documentation-only closeout does not rerun them.
+Remaining checks: **DeepL regression, DPI 100%/150%, and multi-monitor pending / not tested**.
+Two real DeepL requests timed out (HTTP 0). This is not a confirmed Phase 7B.2
+regression: the translation backend is unchanged and historical DeepL success remains recorded.
 See [Phase 7B.2 architecture, evidence and acceptance checklist](docs/overlay-controls-phase7b2.md).
 No new package/license work, Installer, Audio/ASR or Phase 8.
 
