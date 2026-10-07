@@ -478,6 +478,13 @@ Phase 8D.1 提供独立的 `TranslatorStreamingAsrProbe`，仅用于本地流式
 测试结果、已知限制与显式本地依赖构建方式见
 [Streaming ASR Feasibility](docs/streaming-asr-feasibility-phase8d1.md)。
 
+Phase 8D.1A 的独立 Paraformer / Zipformer 准确率比较当前仍为 **PARTIAL**：
+固定 WAV、隔离 live loopback 和真实 Realtek 麦克风同一 PCM A/B 已完成。
+Zipformer 干净 loopback 10/10 正确、中文麦克风表现更好，但真实英语麦克风准确率仍不足；
+不宣称 production accuracy PASS，不接入正式 UI。Phase 8D.1 / Phase 8D 保持 PARTIAL。
+正式 Translator 不使用这些 QA streaming 模型；详见
+[Streaming ASR Accuracy](docs/streaming-asr-accuracy-phase8d1a.md)。
+
 需要 CMake、Ninja、支持 C++17 的编译器，以及包含 Core、Gui、Widgets、Network 组件的 Qt 6 开发环境。Qt 安装位置通过标准 CMake 机制发现；必要时由构建者在命令行设置 `CMAKE_PREFIX_PATH` 或 `Qt6_DIR`，也可使用环境变量 `CMAKE_PREFIX_PATH`。Windows 上构建和运行时还需让对应 MinGW 与 Qt 的 `bin` 目录可从 `PATH` 找到。工程本身不硬编码本机安装路径。
 
 ```powershell

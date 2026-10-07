@@ -1,5 +1,6 @@
 #pragma once
 #include "StreamingProbeCore.h"
 namespace StreamingProbe {
-std::unique_ptr<IOnlineRecognizer> createSherpa(const QString &modelDir, int threads, bool endpoints);
+std::unique_ptr<IOnlineRecognizer> createSherpa(const QString &modelDir, int threads, bool endpoints,
+    const QString &model = QStringLiteral("paraformer"));
 }

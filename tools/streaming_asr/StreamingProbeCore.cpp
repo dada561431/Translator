@@ -103,6 +103,7 @@ void Worker::stop() {
 }
 void Worker::run() {
     try {
+        sink_({{"event", "before_model"}, {"working_set_bytes", workingSetBytes()}});
         QElapsedTimer load; load.start();
         auto recognizer = factory_();
         if (!recognizer) throw std::runtime_error("Recognizer factory returned null");
@@ -117,6 +118,7 @@ void Worker::run() {
         const double cpuStart = processCpuMs();
         qint64 received = 0, revision = 0, segment = 0, decodeCount = 0;
         qint64 first = -1, last = -1, rewrites = 0, conflicts = 0;
+        qint64 lastProgressSamples = 0;
         qint64 maxMemory = workingSetBytes();
         double computeMs = 0;
         bool flushing = false, discontinuity = false;
@@ -174,6 +176,12 @@ void Worker::run() {
             QElapsedTimer timer; timer.start(); recognizer->accept(samples);
             computeMs += timer.nsecsElapsed() / 1e6; decode();
             maxMemory = std::max(maxMemory, workingSetBytes());
+            if (received - lastProgressSamples >= 3200) {
+                lastProgressSamples = received;
+                sink_({{"event", "progress"}, {"wall_ms", wall()}, {"audio_ms", received / 16.},
+                    {"compute_ms", computeMs}, {"decode_count", decodeCount},
+                    {"ready_drained", !recognizer->ready()}, {"backlog_ms", mailbox_.stats().bytes / 32.}});
+            }
             if (endpoints_ && recognizer->endpoint()) {
                 const double at = wall();
                 sink_({{"event", "endpoint"}, {"wall_ms", at}, {"audio_ms", received / 16.}, {"segment", segment}});
@@ -199,6 +207,8 @@ void Worker::run() {
             {"queue_high_water_ms", q.highWaterBytes / 32.}, {"backlog_ms", q.bytes / 32.},
             {"dropped_chunks", qint64(q.dropped)}, {"model_load_count", 1},
             {"flush_zero_tail_ms", flushMs_}, {"capture_discontinuities", discontinuities}, {"translation_requests", 0}});
+        recognizer.reset();
+        sink_({{"event", "model_unloaded"}, {"working_set_bytes", workingSetBytes()}});
     } catch (const std::exception &e) {
         { std::lock_guard<std::mutex> lock(mutex_); failed_ = true; stateChanged_.notify_all(); }
         sink_({{"event", "error"}, {"message", QString::fromUtf8(e.what())}});

@@ -9,7 +9,8 @@ namespace StreamingProbe {
 namespace {
 class Sherpa final : public IOnlineRecognizer {
 public:
-    Sherpa(QString dir, int threads, bool endpoints) : dir_(std::move(dir)), threads_(threads), endpoints_(endpoints) {}
+    Sherpa(QString dir, int threads, bool endpoints, QString model)
+        : dir_(std::move(dir)), model_(std::move(model)), threads_(threads), endpoints_(endpoints) {}
     ~Sherpa() override {
         if (stream_) SherpaOnnxDestroyOnlineStream(stream_);
         if (recognizer_) SherpaOnnxDestroyOnlineRecognizer(recognizer_);
@@ -34,14 +35,26 @@ public:
         auto path = [&](const char *file) {
             QFileInfo info(QDir(dir_).filePath(QLatin1String(file)));
             if (!info.isFile() || !info.isReadable() || info.size() == 0)
-                throw std::runtime_error("Missing/unreadable local Paraformer model input");
+                throw std::runtime_error("Missing/unreadable local model input");
             return info.absoluteFilePath().toUtf8();
         };
-        const auto encoder = path("encoder.int8.onnx"), decoder = path("decoder.int8.onnx"), tokens = path("tokens.txt");
+        if (model_ != "paraformer" && model_ != "zipformer") throw std::runtime_error("Unsupported QA model");
+        const bool zip = model_ == "zipformer";
+        const auto encoder = path(zip ? "encoder-epoch-99-avg-1.int8.onnx" : "encoder.int8.onnx");
+        // Official Zipformer int8 recipe keeps its small decoder in FP32.
+        const auto decoder = path(zip ? "decoder-epoch-99-avg-1.onnx" : "decoder.int8.onnx");
+        const auto tokens = path("tokens.txt");
+        const auto joiner = zip ? path("joiner-epoch-99-avg-1.int8.onnx") : QByteArray{};
         SherpaOnnxOnlineRecognizerConfig config{};
         config.feat_config.sample_rate = 16000; config.feat_config.feature_dim = 80;
-        config.model_config.paraformer.encoder = encoder.constData();
-        config.model_config.paraformer.decoder = decoder.constData();
+        if (zip) {
+            config.model_config.transducer.encoder = encoder.constData();
+            config.model_config.transducer.decoder = decoder.constData();
+            config.model_config.transducer.joiner = joiner.constData();
+        } else {
+            config.model_config.paraformer.encoder = encoder.constData();
+            config.model_config.paraformer.decoder = decoder.constData();
+        }
         config.model_config.tokens = tokens.constData(); config.model_config.provider = "cpu";
         config.model_config.num_threads = threads_; config.decoding_method = "greedy_search";
         config.enable_endpoint = endpoints_; config.rule1_min_trailing_silence = 2.4f;
@@ -54,6 +67,7 @@ public:
             {"onnxruntime", runtimeVersion},
             {"sherpa_ort_build_metadata", QString::fromUtf8(SherpaOnnxGetOnnxruntimeVersionStr())},
             {"ort_telemetry_disabled", true},
+            {"model", model_}, {"decoding_method", "greedy_search"},
             {"provider", "cpu"}, {"threads", threads_}, {"endpoint_enabled", endpoints_}};
     }
     void accept(const std::vector<float> &samples) override {
@@ -71,7 +85,7 @@ public:
     void reset() override { SherpaOnnxOnlineStreamReset(recognizer_, stream_); }
     void finish() override { SherpaOnnxOnlineStreamInputFinished(stream_); }
 private:
-    QString dir_;
+    QString dir_, model_;
     int threads_;
     bool endpoints_;
     const SherpaOnnxOnlineRecognizer *recognizer_ = nullptr;
@@ -80,7 +94,7 @@ private:
     OrtEnv *env_ = nullptr;
 };
 }
-std::unique_ptr<IOnlineRecognizer> createSherpa(const QString &modelDir, int threads, bool endpoints) {
-    return std::make_unique<Sherpa>(modelDir, threads, endpoints);
+std::unique_ptr<IOnlineRecognizer> createSherpa(const QString &modelDir, int threads, bool endpoints, const QString &model) {
+    return std::make_unique<Sherpa>(modelDir, threads, endpoints, model);
 }
 }

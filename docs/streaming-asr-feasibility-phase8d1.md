@@ -4,6 +4,12 @@ Date: 2026-10-07. Initial commit: `89f02314cdd473e89c035eb37ea37082b4652b01`.
 Single agent, no worktrees. All work is confined to Translator.
 
 **Phase 8D.1: PARTIAL. Do not integrate this candidate into production yet.**
+
+Follow-up [Phase 8D.1A accuracy report](streaming-asr-accuracy-phase8d1a.md)
+now supplies valid clean live loopback and owner-confirmed same-PCM microphone
+A/B measurements. Clean loopback passes, but microphone English remains weak;
+Phase 8D.1 and Phase 8D are not promoted. Historical measurements below remain
+unchanged; no production streaming integration was performed.
 The native C ABI, multilingual model, bounded worker, incremental WAV results,
 and user-observed live microphone streaming work. Controlled loopback acceptance
 and precise independently annotated speech-boundary latency remain incomplete.

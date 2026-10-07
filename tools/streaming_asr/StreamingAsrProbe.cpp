@@ -12,6 +12,7 @@
 #include <QElapsedTimer>
 #include <QFile>
 #include <QFileInfo>
+#include <QDir>
 #include <QJsonDocument>
 #include <QMediaPlayer>
 #include <QAudioOutput>
@@ -54,7 +55,7 @@ QByteArray readWav(const QString &path, QString &error) {
                 && qFromLittleEndian<quint16>(f.constData() + 12) == 2
                 && qFromLittleEndian<quint16>(f.constData() + 14) == 16;
         } else if (chunk.left(4) == "data") {
-            if (size > 16000 * 60 * 2 || !pcm.isEmpty()) { error = QStringLiteral("Maximum 60s, single data chunk"); return {}; }
+            if (size > 16000 * 300 * 2 || !pcm.isEmpty()) { error = QStringLiteral("Maximum 300s, single data chunk"); return {}; }
             pcm = file.read(size);
         }
         if (!file.seek(next)) { error = QStringLiteral("WAV seek failed"); return {}; }
@@ -63,6 +64,16 @@ QByteArray readWav(const QString &path, QString &error) {
         error = QStringLiteral("Require 16 kHz mono PCM16 LE WAV; no resampling"); return {};
     }
     return pcm;
+}
+QByteArray wavHeader(quint32 size) {
+    QByteArray header(44, '\0');
+    header.replace(0, 4, "RIFF"); header.replace(8, 8, "WAVEfmt "); header.replace(36, 4, "data");
+    qToLittleEndian<quint32>(size + 36, header.data() + 4);
+    qToLittleEndian<quint32>(16, header.data() + 16);
+    qToLittleEndian<quint16>(1, header.data() + 20); qToLittleEndian<quint16>(1, header.data() + 22);
+    qToLittleEndian<quint32>(16000, header.data() + 24); qToLittleEndian<quint32>(32000, header.data() + 28);
+    qToLittleEndian<quint16>(2, header.data() + 32); qToLittleEndian<quint16>(16, header.data() + 34);
+    qToLittleEndian<quint32>(size, header.data() + 40); return header;
 }
 }
 int main(int argc, char **argv) {
@@ -73,8 +84,10 @@ int main(int argc, char **argv) {
     else application = std::make_unique<QCoreApplication>(argc, argv);
     auto &app = *application;
     QCommandLineParser p; p.addHelpOption();
-    p.setApplicationDescription("Standalone local streaming ASR QA. No translation, production UI, recording or downloads.");
-    p.addOptions({{"model-dir", "Prepared bilingual int8 Paraformer", "path"},
+    p.setApplicationDescription("Standalone local streaming ASR QA. No translation, production UI or downloads. Explicit local QA recording only.");
+    p.addOptions({{"model-dir", "Prepared local model", "path"},
+        {"model", "paraformer|zipformer (greedy CPU)", "name", "paraformer"},
+        {"record-wav", "Explicit live QA only: new WAV under cwd/.cache/phase8d1a/", "path"},
         {"wav", "Real-time paced 16k mono PCM16 WAV", "path"},
         {"kind", "microphone|loopback", "source"}, {"device", "Device ID as hex", "hex"},
         {"seconds", "Live capture duration (1-300)", "n", "45"},
@@ -87,6 +100,7 @@ int main(int argc, char **argv) {
         {"play-wav", "Local QA playback through output; repeat option for playlist (loopback only)", "path"},
         {"preview", "Separate QA-only text window; refreshed at most 10 Hz"},
         {"cue", "Repeatable live microphone reading cues, one every 15s", "text"},
+        {"cue-interval-ms", "QA cue interval (5000-60000)", "n", "15000"},
         {"list-devices", "Enumerate only; do not load model or capture"}});
     p.process(app);
     AudioInputCoordinator audio;
@@ -97,16 +111,19 @@ int main(int argc, char **argv) {
                 {"id_hex", QString::fromLatin1(d.id.toHex())}, {"name", d.description}, {"default", d.isDefault}});
         return 0;
     }
-    bool threadsOk, secondsOk, chunkOk, startOk, endOk, flushOk;
+    bool threadsOk, secondsOk, chunkOk, startOk, endOk, flushOk, cueOk;
+    const int cueInterval = p.value("cue-interval-ms").toInt(&cueOk);
     const int threads = p.value("threads").toInt(&threadsOk), seconds = p.value("seconds").toInt(&secondsOk);
     const int chunk = p.value("chunk-ms").toInt(&chunkOk);
     const int flushMs = p.value("flush-ms").toInt(&flushOk);
     const int speechStart = p.value("speech-start-ms").toInt(&startOk), speechEnd = p.value("speech-end-ms").toInt(&endOk);
     const bool wav = p.isSet("wav"), loopback = p.value("kind") == "loopback";
-    if (!p.isSet("model-dir") || wav == p.isSet("kind") || !threadsOk || threads < 1 || threads > 16
+    if (!p.isSet("model-dir") || (p.value("model") != "paraformer" && p.value("model") != "zipformer")
+        || (wav && p.isSet("record-wav")) || wav == p.isSet("kind") || !threadsOk || threads < 1 || threads > 16
         || !secondsOk || seconds < 1 || seconds > 300 || !chunkOk || (chunk != 20 && chunk != 40 && chunk != 100 && chunk != 200)
         || !startOk || !endOk || speechStart < -1 || speechEnd < -1
         || !flushOk || flushMs < 0 || flushMs > 2000
+        || !cueOk || cueInterval < 5000 || cueInterval > 60000
         || (!wav && !loopback && p.value("kind") != "microphone") || (p.isSet("play-wav") && !loopback)) return 2;
     QString error; QByteArray pcm;
     if (wav) {
@@ -122,6 +139,20 @@ int main(int argc, char **argv) {
     const auto playlist = p.values("play-wav");
     for (const auto &path : playlist) {
         if (readWav(path, error).isEmpty()) { print({{"event", "input_error"}, {"message", error}}); return 2; }
+    }
+    QFile recording;
+    quint32 recordedBytes = 0;
+    if (p.isSet("record-wav")) {
+        const QString root = QFileInfo(".cache/phase8d1a").canonicalFilePath();
+        const QFileInfo target(p.value("record-wav"));
+        const QString parent = target.dir().canonicalPath();
+        if (root.isEmpty() || parent.isEmpty() || (parent.compare(root, Qt::CaseInsensitive) != 0
+            && !parent.startsWith(root + '/', Qt::CaseInsensitive)) || target.exists()) {
+            print({{"event", "input_error"}, {"message", "QA recording must be a new file under cwd/.cache/phase8d1a/"}}); return 2;
+        }
+        recording.setFileName(target.absoluteFilePath());
+        if (!recording.open(QIODevice::WriteOnly | QIODevice::NewOnly) || recording.write(wavHeader(0)) != 44) return 2;
+        print({{"event", "qa_recording"}, {"path", recording.fileName()}, {"explicit_only", true}});
     }
     const bool endpoint = p.isSet("endpoint");
     std::mutex previewMutex; QString latestText;
@@ -140,13 +171,13 @@ int main(int argc, char **argv) {
         preview->resize(760, 280); preview->show(); app.processEvents();
     }
     int partialBeforeEnd = 0; qint64 firstPartial = -1;
-    StreamingProbe::Worker worker([&] { return StreamingProbe::createSherpa(p.value("model-dir"), threads, endpoint); },
+    StreamingProbe::Worker worker([&] { return StreamingProbe::createSherpa(p.value("model-dir"), threads, endpoint, p.value("model")); },
         [&](QJsonObject e) {
             if (e.value("event") == "partial" || e.value("event") == "final") {
                 std::lock_guard<std::mutex> lock(previewMutex);
                 latestText = e.value("text").toString();
             }
-            if (e.value("event") == "partial" && !e.value("text").toString().isEmpty()) {
+            if (e.value("event") == "partial" && !e.value("during_flush").toBool() && !e.value("text").toString().isEmpty()) {
                 const qint64 at = qint64(e.value("wall_ms").toDouble());
                 if (firstPartial < 0) firstPartial = at;
                 if (speechEnd >= 0 && at < speechEnd) ++partialBeforeEnd;
@@ -165,7 +196,7 @@ int main(int argc, char **argv) {
         { std::lock_guard<std::mutex> lock(previewMutex);
           if (textView && latestText != shown) { shown = latestText; textView->setPlainText(shown); } }
         if (!clock.isValid()) return;
-        const int cue = clock.elapsed() < 3000 ? -1 : int((clock.elapsed() - 3000) / 15000);
+        const int cue = clock.elapsed() < 3000 ? -1 : int((clock.elapsed() - 3000) / cueInterval);
         if (cue != lastCue && cue < cues.size()) {
             lastCue = cue;
             if (cueLabel) cueLabel->setText(cue < 0 ? QStringLiteral("Get ready; read each cue once, then remain quiet.") : cues[cue]);
@@ -193,7 +224,9 @@ int main(int argc, char **argv) {
     QObject::connect(&stop, &QTimer::timeout, &app, &QCoreApplication::quit);
     QObject::connect(&health, &QTimer::timeout, &app, [&] {
         const auto q = worker.queueStats();
-        print({{"event", "queue"}, {"wall_ms", clock.elapsed()}, {"backlog_ms", q.bytes / 32.}, {"dropped_chunks", qint64(q.dropped)}});
+        print({{"event", "queue"}, {"wall_ms", clock.elapsed()}, {"backlog_ms", q.bytes / 32.},
+            {"working_set_bytes", StreamingProbe::workingSetBytes()}, {"process_cpu_ms", StreamingProbe::processCpuMs()},
+            {"dropped_chunks", qint64(q.dropped)}});
         if (worker.failed() || q.dropped) { status = 1; app.quit(); }
     });
     QObject::connect(&feed, &QTimer::timeout, &app, [&] {
@@ -208,6 +241,10 @@ int main(int argc, char **argv) {
     });
     double levelEnergy = 0, levelPeak = 0; int levelSamples = 0, liveSamples = 0;
     QObject::connect(&audio, &AudioInputCoordinator::pcmReady, &app, [&](const Audio::PcmChunk &c) {
+        if (recording.isOpen()) {
+            if (recording.write(c.samples) != c.samples.size()) { status = 1; app.quit(); return; }
+            recordedBytes += quint32(c.samples.size());
+        }
         if (c.samples.size() != Audio::ChunkBytes || !worker.push(c.samples, c.discontinuity)) {
             print({{"event", "rejected_pcm"}}); status = 1; app.quit(); return;
         }
@@ -256,6 +293,10 @@ int main(int argc, char **argv) {
     app.exec();
     feed.stop(); stop.stop(); health.stop(); previewTimer.stop(); player.stop();
     const quint64 captureDrops = audio.droppedChunks(); audio.stop();
+    if (recording.isOpen()) {
+        if (!recording.seek(0) || recording.write(wavHeader(recordedBytes)) != 44 || !recording.flush()) status = 1;
+        recording.close(); print({{"event", "qa_recording_closed"}, {"pcm_bytes", qint64(recordedBytes)}});
+    }
     QElapsedTimer teardown; teardown.start(); worker.stop();
     if (worker.failed() || worker.queueStats().dropped || captureDrops) status = 1;
     print({{"event", "teardown"}, {"join_unload_ms", teardown.elapsed()}, {"max_feed_lateness_ms", maxLate},

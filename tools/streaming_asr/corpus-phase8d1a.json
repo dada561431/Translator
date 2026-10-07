@@ -1,0 +1,22 @@
+[
+  {"id":"en01","language":"en","reference":"Hello."},
+  {"id":"en02","language":"en","reference":"Good morning."},
+  {"id":"en03","language":"en","reference":"How are you today?"},
+  {"id":"en04","language":"en","reference":"This is a realtime speech recognition test."},
+  {"id":"en05","language":"en","reference":"The quick brown fox jumps over the lazy dog."},
+  {"id":"en06","language":"en","reference":"Please translate this sentence into Chinese."},
+  {"id":"en07","language":"en","reference":"I am testing streaming speech recognition."},
+  {"id":"en08","language":"en","reference":"The meeting starts at nine thirty tomorrow morning."},
+  {"id":"en09","language":"en","reference":"Qt is a cross-platform application framework."},
+  {"id":"en10","language":"en","reference":"The system should display text while the audio is still playing."},
+  {"id":"zh01","language":"zh","reference":"你好。"},
+  {"id":"zh02","language":"zh","reference":"早上好。"},
+  {"id":"zh03","language":"zh","reference":"今天天气很好。"},
+  {"id":"zh04","language":"zh","reference":"这是一个实时语音识别测试。"},
+  {"id":"zh05","language":"zh","reference":"系统应该在音频播放时持续显示文字。"},
+  {"id":"zh06","language":"zh","reference":"我正在测试流式语音识别功能。"},
+  {"id":"zh07","language":"zh","reference":"明天上午九点半开始会议。"},
+  {"id":"zh08","language":"zh","reference":"这个程序使用 Qt 开发。"},
+  {"id":"zh09","language":"zh","reference":"请把这句话翻译成英文。"},
+  {"id":"zh10","language":"zh","reference":"我们需要比较识别速度和准确率。"}
+]
