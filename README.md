@@ -2,6 +2,24 @@
 
 `Translator` 是一个基于 Qt 6、C++17 和 Qt Widgets 的实时屏幕文字识别与翻译程序。本项目参考 LunaTranslator 的架构和功能设计，但采用独立的 Qt 6/C++ 实现；原 LunaTranslator 源码保持独立且不受本工程影响。
 
+## Phase 8B Local ASR Backend
+
+**Phase 8B Core Acceptance: PASS.** Normal Release/Debug each pass 21/21 CTest
+suites; whisper-enabled Release/Debug each pass 22/22. Real speech Partial/Final,
+five-utterance model reuse, cancellation recovery and cleanup are verified locally.
+
+Independent `TranslatorAsrCore` provides explicit utterances, bounded PCM/snapshot
+jobs, asynchronous model lifecycle, Partial/Final results, cooperative cancellation,
+deadlines and stale-result protection. An explicitly prepared whisper.cpp checkout
+enables the optional CPU backend and `TranslatorAsrProbe`; ordinary CMake does not
+fetch source or models. The multilingual ggml-base model and upstream speech sample
+are used only for local QA and are not committed.
+
+No audio capture, model loading, ASR UI or audio-to-translation wiring is added to
+`Translator.exe`. This is **Local ASR Backend**, not Realtime Audio Translation.
+See [Phase 8B architecture, builds and acceptance](docs/asr-backend-phase8b.md).
+Phase 8C is not started. Packaging and license/release work are unchanged.
+
 ## Phase 8A Audio Input Foundation
 
 Independent audio module and local QA Probe: Qt microphone capture and Windows
