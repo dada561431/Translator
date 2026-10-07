@@ -188,7 +188,51 @@ set_target_properties(Translator PROPERTIES
 
 include(CTest)
 
+# Probe-only, never linked by Translator. Prepared local inputs; no downloads.
+add_library(TranslatorStreamingProbeCore STATIC
+    tools/streaming_asr/StreamingProbeCore.h tools/streaming_asr/StreamingProbeCore.cpp)
+target_include_directories(TranslatorStreamingProbeCore PUBLIC tools/streaming_asr)
+target_link_libraries(TranslatorStreamingProbeCore PUBLIC TranslatorAsrCore)
+if(WIN32)
+    target_link_libraries(TranslatorStreamingProbeCore PRIVATE psapi)
+endif()
+set(TRANSLATOR_SHERPA_ONNX_DIR "" CACHE PATH "Prepared sherpa v1.13.8 headers/runtime for QA only")
+if(TRANSLATOR_SHERPA_ONNX_DIR)
+    find_path(SHERPA_PROBE_INCLUDE sherpa-onnx/c-api/c-api.h
+        PATHS "${TRANSLATOR_SHERPA_ONNX_DIR}/include" NO_DEFAULT_PATH REQUIRED)
+    find_library(SHERPA_PROBE_LIBRARY NAMES sherpa-onnx-c-api
+        PATHS "${TRANSLATOR_SHERPA_ONNX_DIR}/lib" NO_DEFAULT_PATH REQUIRED)
+    find_path(SHERPA_PROBE_ORT_INCLUDE onnxruntime_c_api.h
+        PATHS "${TRANSLATOR_SHERPA_ONNX_DIR}/include" NO_DEFAULT_PATH REQUIRED)
+    find_library(SHERPA_PROBE_ORT_LIBRARY NAMES onnxruntime
+        PATHS "${TRANSLATOR_SHERPA_ONNX_DIR}/lib" NO_DEFAULT_PATH REQUIRED)
+    set(TRANSLATOR_SHERPA_RUNTIME_DIR "" CACHE PATH "Prepared QA DLL folder; copied beside Probe only")
+    add_executable(TranslatorStreamingAsrProbe
+        tools/streaming_asr/StreamingAsrProbe.cpp tools/streaming_asr/SherpaOnlineRecognizer.cpp)
+    target_include_directories(TranslatorStreamingAsrProbe PRIVATE "${SHERPA_PROBE_INCLUDE}" "${SHERPA_PROBE_ORT_INCLUDE}")
+    target_link_libraries(TranslatorStreamingAsrProbe PRIVATE
+        TranslatorStreamingProbeCore TranslatorAudio Qt6::Widgets "${SHERPA_PROBE_LIBRARY}" "${SHERPA_PROBE_ORT_LIBRARY}")
+    if(WIN32)
+        target_link_libraries(TranslatorStreamingAsrProbe PRIVATE psapi)
+        if(NOT TRANSLATOR_SHERPA_RUNTIME_DIR)
+            message(FATAL_ERROR "Set TRANSLATOR_SHERPA_RUNTIME_DIR to prepared sherpa/ORT 1.28.2 DLLs (no downloads)")
+        endif()
+        foreach(dll sherpa-onnx-c-api.dll onnxruntime.dll onnxruntime_providers_shared.dll)
+            if(NOT EXISTS "${TRANSLATOR_SHERPA_RUNTIME_DIR}/${dll}")
+                message(FATAL_ERROR "Missing local QA runtime: ${dll}")
+            endif()
+            add_custom_command(TARGET TranslatorStreamingAsrProbe POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different "${TRANSLATOR_SHERPA_RUNTIME_DIR}/${dll}"
+                "$<TARGET_FILE_DIR:TranslatorStreamingAsrProbe>")
+        endforeach()
+    endif()
+endif()
+
 if(BUILD_TESTING)
+    add_executable(TranslatorStreamingProbeTests tests/StreamingProbeTest.cpp)
+    target_link_libraries(TranslatorStreamingProbeTests PRIVATE TranslatorStreamingProbeCore)
+    add_test(NAME phase8d1_streaming_probe_contract COMMAND TranslatorStreamingProbeTests)
+    set_tests_properties(phase8d1_streaming_probe_contract PROPERTIES TIMEOUT 15)
     add_executable(TranslatorAudioProductizationTests tests/AudioProductizationTest.cpp
         ${OVERLAY_INTERACTION_SOURCES}
         src/gui/TranslationWindow.cpp src/gui/TranslationWindow.h

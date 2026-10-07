@@ -473,6 +473,11 @@ Region 按钮会选择并截取一次屏幕区域，然后发起一次本地 OCR
 
 ## 构建
 
+Phase 8D.1 提供独立的 `TranslatorStreamingAsrProbe`，仅用于本地流式 ASR 可行性验证，
+尚未接入正式 Translator。当前状态为 **PARTIAL**，Phase 8D 仍保持 **PARTIAL**。
+测试结果、已知限制与显式本地依赖构建方式见
+[Streaming ASR Feasibility](docs/streaming-asr-feasibility-phase8d1.md)。
+
 需要 CMake、Ninja、支持 C++17 的编译器，以及包含 Core、Gui、Widgets、Network 组件的 Qt 6 开发环境。Qt 安装位置通过标准 CMake 机制发现；必要时由构建者在命令行设置 `CMAKE_PREFIX_PATH` 或 `Qt6_DIR`，也可使用环境变量 `CMAKE_PREFIX_PATH`。Windows 上构建和运行时还需让对应 MinGW 与 Qt 的 `bin` 目录可从 `PATH` 找到。工程本身不硬编码本机安装路径。
 
 ```powershell
