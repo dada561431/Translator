@@ -2,6 +2,22 @@
 
 `Translator` 是一个基于 Qt 6、C++17 和 Qt Widgets 的实时屏幕文字识别与翻译程序。本项目参考 LunaTranslator 的架构和功能设计，但采用独立的 Qt 6/C++ 实现；原 LunaTranslator 源码保持独立且不受本工程影响。
 
+## Phase 8C Realtime Audio Translation Pipeline
+
+**Phase 8C: PARTIAL; complete Core Acceptance is not claimed.** Independent
+`AudioTranslationCoordinator` joins real microphone / WASAPI capture, persistent
+whisper.cpp, Final-only `TranslationCoordinator` routing and the existing subtitle
+window through an explicit QA entry. Ordinary startup remains OCR-only and never
+opens an audio device. No new mode/model/device UI or audio packaging is included.
+
+Real loopback produced 7 Finals / 7 successful DeepL translations; five warm
+restarts retained one model load. Real Realtek microphone delivered 14 Finals and
+14 translations, but the owner reports English recognition was inaccurate:
+microphone semantic acceptance remains pending, not relabeled PASS. Standard
+Release/Debug pass 22/22 CTest; whisper-enabled Release/Debug pass 23/23.
+See [Phase 8C architecture, evidence and limitations](docs/audio-translation-pipeline-phase8c.md).
+Phase 8D is not started.
+
 ## Phase 8B Local ASR Backend
 
 **Phase 8B Core Acceptance: PASS.** Normal Release/Debug each pass 21/21 CTest
@@ -18,7 +34,8 @@ are used only for local QA and are not committed.
 No audio capture, model loading, ASR UI or audio-to-translation wiring is added to
 `Translator.exe`. This is **Local ASR Backend**, not Realtime Audio Translation.
 See [Phase 8B architecture, builds and acceptance](docs/asr-backend-phase8b.md).
-Phase 8C is not started. Packaging and license/release work are unchanged.
+The subsequent Phase 8C QA integration is documented above. Packaging and
+license/release work are unchanged.
 
 ## Phase 8A Audio Input Foundation
 

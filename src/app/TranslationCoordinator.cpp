@@ -46,17 +46,34 @@ void TranslationCoordinator::acceptOcr(const OcrResult &ocr)
         || settings_.translator() == QLatin1String("none")) return;
     if (!ocr.sourceLanguage.isEmpty() && ocr.sourceLanguage != settings_.sourceLanguage()) return;
 
+    submitText(ocr.text, settings_.sourceLanguage(), settings_.targetLanguage());
+}
+
+void TranslationCoordinator::acceptText(const QString &text, const QString &sourceLanguage,
+                                       const QString &targetLanguage)
+{
+    invalidate();
+    submitText(text, sourceLanguage, targetLanguage);
+}
+
+void TranslationCoordinator::submitText(const QString &text, const QString &sourceLanguage,
+                                       const QString &targetLanguage)
+{
+    if (text.trimmed().isEmpty() || settings_.translator() == QLatin1String("none")) return;
     TranslationRequest request;
     request.requestId = ++nextRequestId_;
-    request.sourceText = ocr.text.trimmed();
-    request.sourceLanguage = settings_.sourceLanguage();
-    request.targetLanguage = settings_.targetLanguage();
+    request.sourceText = text.trimmed();
+    request.sourceLanguage = sourceLanguage;
+    request.targetLanguage = targetLanguage;
     activeRequestId_ = request.requestId;
     emit stateChanged(TranslationState::Pending);
+    if (activeRequestId_ != request.requestId) return;
+    emit requestStarted(request);
+    if (activeRequestId_ != request.requestId) return;
 #ifndef NDEBUG
     qDebug() << "[Translation] request start" << QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)
              << "requestId=" << request.requestId << "sourceChars=" << request.sourceText.size()
-             << "OCR elapsed=" << ocr.elapsedMs;
+             << "source=" << request.sourceLanguage;
 #endif
 
     if (request.sourceLanguage == request.targetLanguage) {

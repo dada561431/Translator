@@ -12,7 +12,7 @@ set(CMAKE_AUTORCC ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network)
 
-# Independent foundation: no audio acquisition is wired into the overlay application.
+# Audio acquisition is opt-in through the Phase 8C QA entry, never normal startup.
 find_package(Qt6 REQUIRED COMPONENTS Multimedia)
 add_library(TranslatorAudio STATIC
     src/audio/AudioInputTypes.h src/audio/IAudioInput.h
@@ -26,7 +26,7 @@ if(WIN32)
     target_link_libraries(TranslatorAudio PRIVATE ole32 uuid)
 endif()
 
-# No downloads or application wiring: external checkout is explicitly opt-in.
+# No downloads: external checkout is explicitly opt-in.
 add_library(TranslatorAsrCore STATIC
     src/asr/AsrTypes.h src/asr/IAsrBackend.h
     src/asr/AsrAudioBuffer.h src/asr/AsrAudioBuffer.cpp
@@ -117,6 +117,13 @@ if(WIN32)
     target_link_libraries(TranslatorProviders PRIVATE advapi32)
 endif()
 
+add_library(TranslatorAudioPipeline STATIC
+    src/app/AudioTranslationCoordinator.h src/app/AudioTranslationCoordinator.cpp
+    src/app/InputPipelineController.h
+    src/app/TranslationCoordinator.h src/app/TranslationCoordinator.cpp
+    src/config/SettingsManager.h src/config/SettingsManager.cpp)
+target_link_libraries(TranslatorAudioPipeline PUBLIC TranslatorAudio TranslatorAsrCore TranslatorProviders Qt6::Gui)
+
 add_executable(Translator
     ${OVERLAY_INTERACTION_SOURCES}
     ${PADDLE_OCR_SOURCES}
@@ -168,6 +175,12 @@ set_target_properties(Translator PROPERTIES
 include(CTest)
 
 if(BUILD_TESTING)
+    add_executable(TranslatorAudioTranslationTests tests/AudioTranslationTest.cpp
+        src/gui/TranslationWindow.cpp src/gui/TranslationWindow.h
+        src/gui/SettingsDialog.cpp src/gui/SettingsDialog.h)
+    target_link_libraries(TranslatorAudioTranslationTests PRIVATE TranslatorAudioPipeline TranslatorOverlayPlatform Qt6::Widgets)
+    add_test(NAME phase8c_audio_translation COMMAND TranslatorAudioTranslationTests)
+    set_tests_properties(phase8c_audio_translation PROPERTIES TIMEOUT 30 ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
     add_executable(TranslatorAsrBufferTests tests/AsrBufferTest.cpp)
     target_link_libraries(TranslatorAsrBufferTests PRIVATE TranslatorAsrCore)
     add_test(NAME phase8b_asr_buffer COMMAND TranslatorAsrBufferTests)
@@ -181,6 +194,12 @@ if(BUILD_TESTING)
         add_test(NAME phase8b_whisper_contract COMMAND TranslatorWhisperContractTests)
         add_executable(TranslatorAsrProbe tests/AsrProbe.cpp)
         target_link_libraries(TranslatorAsrProbe PRIVATE TranslatorWhisperCppBackend)
+        add_executable(TranslatorAudioTranslationProbe tests/AudioTranslationProbe.cpp
+            src/translator/TranslatorFactory.cpp src/translator/TranslatorFactory.h
+            src/gui/TranslationWindow.cpp src/gui/TranslationWindow.h
+            src/gui/SettingsDialog.cpp src/gui/SettingsDialog.h)
+        target_link_libraries(TranslatorAudioTranslationProbe PRIVATE TranslatorAudioPipeline
+            TranslatorWhisperCppBackend TranslatorOverlayPlatform Qt6::Widgets)
         if(WIN32)
             target_link_libraries(TranslatorAsrProbe PRIVATE psapi)
         endif()

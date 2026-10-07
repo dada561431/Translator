@@ -16,13 +16,16 @@ public:
     using BackendFactory = std::function<std::unique_ptr<ITranslator>()>;
     TranslationCoordinator(SettingsManager &settings, BackendFactory factory, QObject *parent = nullptr);
     void acceptOcr(const OcrResult &result);
+    void acceptText(const QString &text, const QString &sourceLanguage, const QString &targetLanguage);
     void invalidate(bool resetDisplay = true);
 
 signals:
+    void requestStarted(const TranslationRequest &request);
     void stateChanged(TranslationState state);
     void resultReady(const TranslationResult &result);
 
 private:
+    void submitText(const QString &text, const QString &sourceLanguage, const QString &targetLanguage);
     void receiveResult(const TranslationResult &result);
     void connectBackend();
     BackendFactory factory_;
