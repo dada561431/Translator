@@ -1,511 +1,384 @@
 # Translator
 
-`Translator` 是一个基于 Qt 6、C++17 和 Qt Widgets 的实时屏幕文字识别与翻译程序。本项目参考 LunaTranslator 的架构和功能设计，但采用独立的 Qt 6/C++ 实现；原 LunaTranslator 源码保持独立且不受本工程影响。
+Translator 是一个基于 Qt 6 / C++ 的 Windows 实时字幕与翻译应用，支持屏幕区域文字、
+麦克风语音和系统播放音频三类输入。它将本地 OCR / ASR 识别结果显示在悬浮字幕窗口中，
+并可通过 DeepL 或 OpenAI-compatible 服务生成翻译字幕。
 
-## Phase 8D Audio Productization Candidate
+项目参考 LunaTranslator 的产品与功能思路，采用自己的 Qt/C++ 模块化实现。
+当前主要开发与验收平台为 Windows 11，不宣称 Linux、macOS 或其他平台已完成支持。
 
-**Phase 8D / Phase 8 Overall Core Acceptance: PARTIAL.** Production input-mode
-controls, audio Settings and local runtime deployment are implemented. Ordinary
-Release/Debug each pass **24/24** CTest suites; Whisper-enabled Release/Debug each
-pass **25/25**. The local candidate starts without the development Qt PATH and
-passes its Paddle runtime self-check (20/20); static dependency audit: zero missing.
-Production microphone/loopback/DeepL subtitle acceptance and the new audio
-candidate's clean Windows acceptance are still **PENDING**, not inherited from
-older Probe or OCR-only Sandbox results. Public redistribution remains pending
-owner/license review; no public ZIP or installer is produced.
+> Functional Development: Complete
+>
+> Core Functional Acceptance: PASS
+>
+> Public Release / Installer / Full Release Engineering: Out of Scope
 
-Candidate usage (requires a Whisper-enabled build and local model):
+以上状态指课程项目范围内、已测试环境中的核心功能，不代表所有识别内容均准确，
+也不代表第三方组件的公开再分发已获许可。详细设计和历史验收记录保留在 `docs/`。
 
-1. Configure the translation provider in Settings; None enables transcription only.
-2. Configure a local speech model, or put `ggml-base.bin` beside the application in `models/`.
-3. Select the microphone/output device and speech recognition language in Settings, then Apply.
-4. Select Screen, Microphone or System Audio in the toolbar or tray, then Start.
-5. Stop explicitly. Changing input mode stops the old pipeline and never starts listening automatically.
+## 核心功能
 
-Audio Region is disabled. Model loading is asynchronous; Stop retains the warm
-model. Changed audio configuration takes effect on the next Stop/Start. Startup
-restores selection only, never Running. No audio is recorded and no model is
-automatically downloaded. Current host: Ctrl+Alt+S registration encountered an
-existing shortcut conflict (Win32 1409); foreground shortcut acceptance is pending.
-See [Phase 8D implementation, packaging, acceptance ledger and remaining checks](docs/audio-productization-phase8d.md).
+### 屏幕 OCR 翻译
 
-## Historical Phase 8C Realtime Audio Translation Pipeline
+- 使用 Region 在一个显示器内框选屏幕区域，保存上次有效选区。
+- Start 后周期截图，通过帧变化检测减少重复 OCR，通过文本去重减少重复翻译。
+- 支持常驻 Python helper 驱动的 PP-OCRv6 Small，以及可选 Tesseract 后端。
+- OCR 在后台执行，只保留最新待处理帧，避免输入无限积压。
+- 原文与译文实时显示；Stop 后旧会话结果不会重新覆盖字幕。
 
-**Phase 8C.1 endpointing and Phase 8C Core Acceptance: PASS for the tested Realtek
-microphone and system loopback.** Independent
-`AudioTranslationCoordinator` joins real microphone / WASAPI capture, persistent
-whisper.cpp, Final-only `TranslationCoordinator` routing and the existing subtitle
-window through an explicit QA entry. Ordinary startup remains OCR-only and never
-opens an audio device. No new mode/model/device UI or audio packaging is included.
+Tesseract fallback 是用户在 Settings 中手动选择的备选方案，不是失败后静默切换。
+两种引擎都需要提前准备对应运行时与语言资源。
 
-Phase 8C's initial inaccurate microphone test remains documented as historical
-PARTIAL evidence. Phase 8C.1 now uses independent RMS endpointing with pre-roll,
-600 ms trailing silence and a 12-second safety cap; legacy 4s remains QA-only.
-The owner confirmed six individually spoken English prompts were correctly
-recognized in the tuned energy run, with six real DeepL subtitle translations.
-Speech-end -> Final median was 1415 ms; end -> translation median 1741.5 ms.
-Live loopback recognized the full official short speech fixture, produced no
-periodic silent Finals, and six Stop/Start cycles retained one model load.
-Normal Release/Debug pass 23/23 CTest; whisper-enabled Release/Debug pass 24/24.
-Energy detection cannot classify music/noise; other gains/devices need their own
-acceptance. This is not universal ASR accuracy or complete low-latency Audio UX.
-See [Phase 8C.1 parameters, actual A/B, tests and limitations](docs/speech-endpointing-phase8c1.md).
-See [Phase 8C architecture, evidence and limitations](docs/audio-translation-pipeline-phase8c.md).
-These Phase 8C results are historical component/Probe evidence, not Phase 8D production UI acceptance.
+### 麦克风实时字幕与翻译
 
-## Phase 8B Local ASR Backend
+- 使用 Qt Multimedia / QAudioSource 采集所选麦克风。
+- 转换为统一的 16 kHz、mono、int16 LE PCM，每块 20 ms。
+- 可选 Zipformer Streaming ASR 在讲话期间更新原文 Partial。
+- Energy-based endpointing 判断句段结束，再由 Whisper 生成 Final。
+- 仅将非空 Whisper Final 送入翻译，不对每次 Partial 发起网络请求。
 
-**Phase 8B Core Acceptance: PASS.** Normal Release/Debug each pass 21/21 CTest
-suites; whisper-enabled Release/Debug each pass 22/22. Real speech Partial/Final,
-five-utterance model reuse, cancellation recovery and cleanup are verified locally.
+### 系统音频实时字幕与翻译
 
-Independent `TranslatorAsrCore` provides explicit utterances, bounded PCM/snapshot
-jobs, asynchronous model lifecycle, Partial/Final results, cooperative cancellation,
-deadlines and stale-result protection. An explicitly prepared whisper.cpp checkout
-enables the optional CPU backend and `TranslatorAsrProbe`; ordinary CMake does not
-fetch source or models. The multilingual ggml-base model and upstream speech sample
-are used only for local QA and are not committed.
+- 使用 Windows WASAPI loopback 采集所选输出设备的播放音频。
+- 不需要通过麦克风拾取扬声器声音，适合视频、课程或其他播放内容。
+- 复用同一套 Streaming Original、Whisper Final 和翻译协调逻辑。
+- 三种模式互斥；切换模式停止旧管线，再次 Start 才开始新输入。
 
-No audio capture, model loading, ASR UI or audio-to-translation wiring is added to
-`Translator.exe`. This is **Local ASR Backend**, not Realtime Audio Translation.
-See [Phase 8B architecture, builds and acceptance](docs/asr-backend-phase8b.md).
-The subsequent Phase 8C QA integration is documented above. Packaging and
-license/release work are unchanged.
+### 字幕窗口
 
-## Phase 8A Audio Input Foundation
+- 无边框、置顶的 floating overlay，译文在上、原文在下。
+- Interactive / ClickThrough 切换，ClickThrough 时隐藏 toolbar。
+- Drag Lock 独立控制拖动与缩放，不影响识别管线。
+- 可调译文/原文字号、字幕背景透明度及字段显示，至少保留一个字段可见。
+- Windows capture exclusion 尽量避免截图包含自身字幕。
+- System Tray 提供 Show/Hide、交互模式、Lock、Region、Start/Stop、Settings 和 Exit。
+- 隐藏窗口不停止管线；恢复显示后可查看最新字幕。
 
-Independent audio module and local QA Probe: Qt microphone capture and Windows
-WASAPI system-output loopback, unified 16 kHz mono int16 LE PCM, 20 ms chunks,
-explicit Start/Stop, bounded delivery and session-safe cleanup. No automatic
-capture on application startup, no ASR, no OCR/translation/subtitle integration.
-Acceptance is tracked separately for microphone and loopback; see
-[Phase 8A architecture and evidence](docs/audio-input-phase8a.md).
-**Phase 8A Core Acceptance: PASS.** Microphone Capture and voice/quiet acceptance
-PASS based on the owner's subsequent real Windows test; System Loopback Capture
-remains independently PASS. Existing Release/Debug and **19/19 CTest suites** PASS;
-both backends passed five-minute stability and 20-cycle Start/Stop probes. This
-documentation-only closeout does not rerun builds/tests. Physical microphone unplug,
-real default-output switching and Windows microphone privacy-denial checks remain
-PENDING / NOT TESTED, non-blocking for Core Acceptance. Phase 8B is not started.
+### 翻译后端
 
-## Phase 7B.2 Overlay Controls
-
-Overlay position lock disables mouse dragging/resizing independently of
-Interactive/ClickThrough. Settings provides three editable global shortcuts;
-defaults remain Ctrl+Alt+T/R/S. Apply validates single modified, unique chords and
-stages all new registrations before replacing the old set. Conflicts preserve the
-old shortcuts and saved configuration; Cancel discards shortcut/lock drafts.
-
-The system tray provides Show/Hide, Interaction, Lock, Region, Start/Stop, Settings
-and Exit. Hiding affects only the overlay, not OCR/translation. Double-click restores
-Show + Interactive. Close still exits; hidden Region selection restores the previous
-visibility. Notification-area unavailability keeps the window recoverable.
-
-**Phase 7B.2 Core Acceptance: PASS**, based on owner-reported real Windows desktop
-tests of drag lock/unlock, independent ClickThrough state, persistent custom
-foreground global shortcuts, all tray commands and tray Interactive recovery.
-Hidden-overlay realtime processing continues; Show displays the latest subtitles.
-Exit leaves no observed Translator/helper residual, and capture exclusion/appearance
-have no observed regression. Existing Release/Debug builds PASS and **16/16 CTest
-suites PASS** in each configuration; this documentation-only closeout does not rerun them.
-Remaining checks: **DeepL regression, DPI 100%/150%, and multi-monitor pending / not tested**.
-Two real DeepL requests timed out (HTTP 0). This is not a confirmed Phase 7B.2
-regression: the translation backend is unchanged and historical DeepL success remains recorded.
-See [Phase 7B.2 architecture, evidence and acceptance checklist](docs/overlay-controls-phase7b2.md).
-No new package/license work, Installer, Audio/ASR or Phase 8.
-
-## Phase 7B.1 Capture Exclusion and Subtitle Appearance
-
-Settings now provides independent Translation/Original font sizes (10-72 pt),
-subtitle background opacity (0-100%), and Original/Translation visibility.
-At least one subtitle field stays enabled. Apply/OK persists these preferences;
-Cancel discards unapplied appearance drafts. These display settings do not restart
-OCR, recreate the translation backend, or stop realtime processing.
-
-Windows capture exclusion is enabled by default and reapplied after native handle
-or interaction-mode changes. It is **best effort, OS/capture API dependent**, not
-a security or DRM guarantee. Unsupported/failed calls leave the app usable.
-**Core acceptance PASS. Remaining environment-specific checks: DPI / multi-monitor.**
-The owner verified real Windows screenshots include the overlay with exclusion OFF
-and exclude it with exclusion ON, while the overlay remains physically visible.
-Interactive/ClickThrough, font sizes, background opacity, field visibility and the
-at-least-one-field guard work normally. Live OCR and DeepL continue after appearance
-changes; Ctrl+Alt+T/R/S have no regression. No obvious self-capture/OCR feedback was
-observed with the overlay covering Region in the tested setup.
-These are owner-reported manual results, not a new agent-run capture test. The earlier
-all-black agent probe remains inconclusive and is preserved in the report, not relabeled
-PASS. Actual 100%/150% DPI and multi-monitor remain pending / not tested.
-Release/Debug: **15/15 CTest suites PASS**; existing results rechecked for this doc-only
-follow-up. Real PP-OCRv6 Small + DeepL image-replay regression also passed.
-See [Phase 7B.1 evidence and manual procedure](docs/overlay-capture-appearance-phase7b1.md).
-No new package or license/release work was performed.
-
-## Phase 7A Overlay Interaction
-
-Windows defaults: **Ctrl+Alt+T** toggles mouse passthrough / Interactive;
-**Ctrl+Alt+R** selects Region; **Ctrl+Alt+S** toggles realtime Start/Stop.
-First run is Interactive. Passthrough hides the toolbar; T restores controls
-before dragging, resizing, opening Settings or closing. The last mode is saved;
-failed T registration forces a safe Interactive startup without deleting that
-preference. Start/Stop is independent of interaction mode. Shortcuts are ignored
-during Region selection and its capture delay, preserving the entry mode.
-
-**Core acceptance PASS. Remaining environment-specific checks: DPI / multi-monitor.**
-The owner manually verified real mouse passthrough, foreground global T/R/S,
-hidden toolbar, restored Interactive click/drag/operation, and continuing live
-PP-OCRv6 Small OCR and enabled translation while ClickThrough on a real Windows
-desktop. These are owner-reported results, not an agent-run desktop test.
-Windows 100%/150% DPI and multi-monitor remain pending / not tested.
-See [Phase 7A report and manual checks](docs/overlay-interaction-phase7a.md).
-Mouse passthrough is independent from capture exclusion. Phase 7B.1 adds the
-best-effort API and appearance controls described above; Phase 7B.2 adds the controls
-described at the top. Public redistribution/licensing work remains deferred; no new
-portable package.
-
-## Phase 6.1C Portable Build Infrastructure
-
-**Technical portable acceptance: PASS. Clean Windows acceptance: PASS.
-Physically offline OCR acceptance: PASS. Release redistribution gate: still
-blocked by OWNER REVIEW REQUIRED.** A Windows x64 technical candidate is generated
-at `dist/TranslatorPortable/`. The selected layout contains
-app-local Python, fixed Paddle packages and the verified small models, with Qt
-DLLs/plugins deployed by `windeployqt`. Development overrides remain supported.
-
-Release/Debug builds and 13/13 CTest suites pass. Local minimal-PATH OCR,
-Unicode/space model paths (with verified user-cache staging), read-only install
-directory, real desktop capture and Stop/Start helper reuse were tested. The
-regenerated candidate now includes hash-pinned, officially signed Microsoft
-VC runtime inputs and passes the 262-binary PE audit with zero missing candidates.
-The owner manually verified the candidate after copying it into a clean Windows
-Sandbox local directory with Networking=Disable: GUI/PP-OCRv6 Small, Region -> Start,
-20/20 self-check, warm Stop/Start and Close cleanup passed, with Provider None and no
-model downloads. These are owner-reported results, not a new agent-run Sandbox test.
-Direct execution from the read-only host-mapped PortableInput folder once timed out
-during helper startup; this is a **non-blocking Windows Sandbox host-mapped-folder
-limitation**, not a fixed issue. Run the Sandbox local copy; production timeout is unchanged.
-Qt and VC runtime redistribution remain **OWNER REVIEW REQUIRED**, and other license
-review remains outstanding. Do not declare public-release ready. No public release
-ZIP/SHA256 or installer is produced.
-
-The portable draft explicitly does **not** bundle Tesseract; selecting it reports
-unavailable instead of borrowing the development machine's installation.
-Outside portable mode the existing Tesseract fallback remains unchanged.
-
-See [build command and acceptance report](docs/windows-portable-runtime-phase61c.md)
-and [runtime license inventory](docs/third-party-runtime-licenses.md).
-The one-command builder is `scripts/package_windows.py`; validation is
-`scripts/validate_windows_package.py`. Inputs are explicit parameters, not
-developer installation paths embedded in CMake or production code.
-
-## Phase 6.1B Production OCR Helper
-
-Settings -> OCR Engine -> **PP-OCRv6 Small** -> select Region -> Start.
-The existing pipeline now supports a persistent local Python/Paddle helper via
-`PaddleOcrEngine`, as well as the unchanged selectable Tesseract backend. Stop
-keeps the helper warm; Close interrupts and terminates it. Switching engines
-replaces the worker-owned engine and retires old results. Failures are explicit;
-Tesseract fallback is a manual selection, not a silent backend change.
-
-This checkout reuses the already verified local runtime at
-`benchmarks/ocr_phase61a/.venv/Scripts/python.exe` and small weights below
-`benchmarks/ocr_phase61a/models/`. The application discovers its checkout from
-the executable location or working directory, including Qt Creator build trees.
-Optional `TRANSLATOR_OCR_PYTHON`, `TRANSLATOR_OCR_HELPER`, and
-`TRANSLATOR_OCR_MODELS` override these paths in the launching environment.
-Missing assets produce an OCR error; the app does not install or download them.
-Pinned runtime packages are in `helpers/ocr/requirements.txt`.
-
-**MKL-DNN is explicitly disabled.** No medium model, GPU default, embedded
-Python or MinGW/MSVC Paddle linkage was introduced in Phase 6.1B. Phase 6.1C
-adds portable-build infrastructure; an installer remains out of scope.
-OCR pixels stay local; the selected online translation provider receives OCR
-text through the existing credential-protected translation implementation.
-`auto` uses the small recognition model directly, unlike Tesseract's English
-fallback. Chinese subtitle quality is verified; English/Japanese quality is not
-established by this ten-frame set. Korean requires Tesseract in this integration.
-
-Release/Debug builds and all 11 CTest suites pass. The native IPC path retains
-9/10 exact matches with one helper PID across 20 requests. A separate real desktop
-capture probe displayed three user-provided paused-video subtitle crops, recognized
-them locally and received three successful HTTP 200 DeepL translations, visibly
-updating the subtitle widgets. This is not continuous-video or Qt Creator manual
-acceptance. See `docs/ocr-helper-phase61b.md` for evidence and remaining limits.
-
-**Known Limitation:** subtitle-free complex backgrounds can occasionally yield
-false short characters that update Original and trigger translation. This is
-not fixed. Phase 6.1B.1 production filtering is deferred; optional metadata and
-local analysis tooling remain, with no new confidence/geometry/temporal filter.
-
-### Historical Phase 6.1A Evaluation
-
-Independent local benchmark tooling is available in `tools/ocr_benchmark/` and
-`benchmarks/ocr_phase61a/`. Ten distinct user-confirmed Bilibili subtitle crops
-were compared using the unchanged production Tesseract pipeline and official
-PP-OCRv6 small/medium CPU pipelines. Exact matches: 1/10, 9/10 and 8/10;
-micro CER: 70.27%, 2.70%, 2.70%. Successful Paddle runs explicitly disable
-MKL-DNN after a Windows runtime incompatibility. Small is the recommended
-production candidate at that evaluation stage; Phase 6.1B integrates small. All private images,
-labels, models, runtimes and raw reports remain local and ignored.
-See `docs/ocr-scene-text-evaluation-phase61a.md` for latency, failure cases,
-limited scene coverage and researched Windows/MinGW deployment routes.
-This paused-frame benchmark does not complete Phase 6 continuous-video acceptance.
-
-## Phase 6 Real-time Pipeline
-
-Region → Start → periodic Capture / OCR / optional Translation → Stop.
-Region still performs a one-shot capture/OCR check and saves the region. Start
-reuses that region and captures immediately, then checks every 300 ms on the
-GUI thread. OCR runs on one background worker; only the newest pending frame
-is retained. Frame comparison reduces OCR work, and normalized-text deduplication
-reduces translation requests. None works without credentials. Two consecutive
-valid empty OCR results clear subtitles; OCR errors keep the previous text.
-
-Stop retires OCR and translation results without waiting for the worker/network.
-Selecting Region while running stops monitoring and stays stopped after selection
-or cancellation. Applied semantic settings retire old work and reprocess with
-the new settings on the next tick. Invalid/disconnected saved screens require a
-new Region; four consecutive capture failures stop monitoring.
-
-Keep the subtitle window and Settings dialog **outside the capture region**.
-QScreen desktop capture does not exclude this application's windows. Overlap
-can feed the displayed subtitles back into OCR. The application does not hide
-and show its window on each tick; capture exclusion is not implemented.
-
-Implementation and seven automated suites are available. Full Phase 6 manual
-acceptance is **pending**: desktop automation was blocked, so the required
-Bilibili five consecutive subtitles and desktop stability checks are not claimed.
-An offline synthetic-input probe uses real Tesseract; it is not video acceptance.
-See `docs/realtime-pipeline-phase6.md` for evidence and limitations.
-
-## Phase 5.1 Provider / Model / Credential Settings
-
-One Region selection still triggers one local OCR operation and one optional
-asynchronous translation. `OcrCoordinator::resultReady` feeds
-`TranslationCoordinator`, then `ITranslator` and the configured backend through
-QtNetwork. Increasing IDs reject stale/duplicate responses. New input invalidates
-the old translation immediately. Pending shows `翻译中…`; Error shows `翻译失败`
-without losing the original text. Settings changes also invalidate pending work.
-
-Settings offer `None` (`none`, default), `DeepL` (`deepl`), and
-`OpenAI Compatible` (`openai_compatible`). None never sends translation requests.
-Online providers send OCR **text**, never images or region pixels. OCR is local;
-online translation is not entirely local processing. Each service has its own
-privacy policy. Models are separate from providers.
-
-### DeepL configuration
-
-For ordinary users: Settings → Translation Provider → DeepL → select Free/Pro →
-Configure / Replace → enter your key → Apply or OK. Windows saves the key in
-Credential Manager, not QSettings. The editor starts empty and masked and never
-loads the existing key. Show temporarily reveals only your new input. Cancel/
-Escape discards unsaved key changes; empty input leaves the old key unchanged.
-Remove stages explicit deletion, committed by Apply/OK.
-
-Developers may still set `DEEPL_API_KEY` in the launching environment. Priority:
-stored GUI credential, then environment, then missing-key error. Deleting a GUI
-credential does not delete the environment fallback. Restart after environment
-changes. Keys are not saved in tracked files, QSettings, screenshots, or logs.
-Unsupported platforms explicitly fail GUI secure storage operations instead of
-falling back to plaintext.
-
-Before a GUI Plan is saved, optional `DEEPL_API_URL` preserves Phase 5 developer
-behavior, defaulting to `https://api-free.deepl.com/v2/translate`. Applied GUI Plan
-takes precedence: Free uses that host, Pro uses `https://api.deepl.com/v2/translate`.
-Only these official HTTPS
-endpoints are accepted; redirects are not followed. TLS verification is enabled.
-Requests have a 15-second deadline and no automatic retries.
-
-| App ID | Source code | Target code |
+| Provider | 用途 | 配置 |
 | --- | --- | --- |
-| `auto` | omit `source_lang` | invalid |
-| `en` | `EN` | `EN-US` |
-| `zh` | `ZH` | `ZH-HANS` (simplified) |
-| `ja` | `JA` | `JA` |
-| `ko` | `KO` | `KO` |
+| None | 只做本地识别和原文字幕，不发送翻译请求 | 无需 API key |
+| DeepL | 在线文本翻译 | Free/Pro 和 API key |
+| OpenAI Compatible | 兼容 Chat Completions 的文本翻译服务 | Base URL、Model、API key |
 
-Translation `auto` uses DeepL detection; Tesseract OCR `auto` falls back to English.
-Equal source/target IDs return text locally. Blank/error OCR is never translated.
-Offline CTest uses fake/coordinator and HTTP fixtures, not real API calls.
-For manual EN → ZH and ZH → EN checks with a configured legitimate key:
+## 系统架构
 
-```powershell
-.\build\mingw\TranslatorDeepLProbe.exe
+### Screen OCR Pipeline
+
+```mermaid
+flowchart TD
+    Region[RegionSelector / Saved Region] --> Capture[ScreenCaptureService]
+    Capture --> Frame[RealtimePipelineCoordinator / FrameComparator]
+    Frame --> OCR[OcrCoordinator / IOcrEngine]
+    OCR --> Paddle[PaddleOcrEngine / Persistent Python Helper]
+    OCR --> Tess[TesseractOcrEngine]
+    Paddle --> Text[TextDeduplicator]
+    Tess --> Text
+    Text --> Original[TranslationWindow / Original Subtitle]
+    Text --> Translate[TranslationCoordinator / Selected Provider]
+    Translate --> Subtitle[TranslationWindow / Translation Subtitle]
 ```
 
-Without a key it reports SKIPPED. Real-provider and Region-to-translation manual
-acceptance remain pending in this environment because no key was configured.
-To test only a saved GUI credential, without using an environment key:
+截图由 Qt 屏幕 API 获取，OCR 在独立 worker 中处理。会话和请求标识拒绝过期结果；
+翻译与 GUI 不直接依赖具体 OCR 实现。Region 本身也进行一次截图与识别检查。
 
-```powershell
-.\build\mingw\TranslatorDeepLProbe.exe --stored-credentials
+### Audio Pipeline
+
+```mermaid
+flowchart TD
+    Mic[Qt Multimedia Microphone] --> Input[AudioInputCoordinator]
+    System[Windows WASAPI Loopback] --> Input
+    Input --> PCM[Same PCM / 16 kHz Mono / 20 ms]
+    PCM --> Stream[StreamingAsrCoordinator / Zipformer Worker]
+    Stream --> Partial[Live Partial / Identity Guards]
+    Partial --> Original[TranslationWindow / Original Subtitle]
+    PCM --> Endpoint[SpeechEndpointDetector]
+    Endpoint --> Whisper[AsrCoordinator / Whisper Final]
+    Whisper --> Final[Final Original / Display-Order Guard]
+    Final --> Original
+    Whisper --> Translate[TranslationCoordinator / Final Only]
+    Translate --> Translated[TranslationWindow / Translation Subtitle]
 ```
 
-### OpenAI-Compatible configuration
+同一份 PCM 一分为二，不会为两个 ASR 各开一个麦克风。`ProductionInputController`
+协调 Start/Stop 和模型准备；模型在后台加载完成后才开始采集。
 
-Settings → OpenAI Compatible → Base URL → Model → Configure / Replace API Key →
-Apply/OK. Base URL is the service API root, including its prefix (often `/v1`),
-not the full completion URL; Translator appends `/chat/completions`. There is no
-default commercial host/model or automatic `/models` discovery. Use your service's
-actual model ID. An API key is required, also for local services in this phase.
+## 实时语音识别架构：双 ASR 设计
 
-Supported profile: non-streaming Chat Completions, Bearer authorization, `model`
-and two `messages`, response `choices[0].message.content` with `finish_reason=stop`.
-Not every compatible service/model necessarily supports this profile. Optional
-sampling parameters are omitted because some models reject them; deterministic
-output is not guaranteed.
+Whisper Final-only 需要等待句段结束；Streaming Zipformer 可以在讲话过程中逐步产出文本，
+改善等待字幕的主观延迟。因此两者分工为 **fast preview + final correction**，
+Zipformer 不替代 Whisper，也不直接提供翻译输入。
 
-Remote URLs must be HTTPS. HTTP is accepted only for `localhost`, `127.0.0.1`,
-or `::1`. URL credentials/query/fragment and redirects are rejected. Missing URL,
-model, or key fails locally rather than sending to a guessed host. OCR text is an
-independent user message under a translation-only system prompt, not a system
-instruction. This reduces injection risk but cannot prove an arbitrary model
-follows instructions. Real-model behavior still needs testing.
+| 结果 | 来源 | 显示与处理 |
+| --- | --- | --- |
+| Partial | Zipformer Streaming ASR | 快速预览，可增加、缩短或修正；只更新 Original |
+| Final | Whisper ggml-base | 句段结束后更新最终原文，并进入翻译 |
+| Translation | 所选 Provider | 对 Final 处理完成后更新译文 |
 
-Source/target/provider and DeepL Plan keep immediate settings behavior. Base URL,
-Model, and credentials apply on Apply/OK. Applied changes invalidate pending
-requests and rebuild the backend. Old `translator/engine` migrates to
-`translator/provider` without resetting unrelated settings or storing secrets.
-See `docs/translation-provider-phase51.md` for current verification and
-`docs/translation-phase5.md` for the historical report. Phase 6 adds monitoring
-without redesigning providers, models, or credentials.
+迟到的 Partial 不能覆盖已应用的 Final，旧句段的 Final 不能覆盖较新句段的 live Original。
+新句段说话期间，译文可以暂时保留上一句已完成的翻译。
+Final correction 表示采用 Whisper 最终结果，不保证每次都比 Partial 更准确。
 
-## Phase 4.1 OCR accuracy status
+Streaming 使用独立 worker 和有界 PCM 队列；超出容量时明确降级为 Final-only，
+不会悄悄丢失中间音频后继续声称识别连续。普通 Stop/Start 保留 warm models。
 
-Phase 4 adds a single-frame OCR path after Region capture. A successful capture
-produces a `CaptureResult::image`; `OcrCoordinator` passes that image and the
-configured source-language ID to an `IOcrEngine` on a worker thread and emits an
-`OcrResult`. Valid recognized text, including an empty result, is passed to
-`TranslationWindow::setOriginalText()`; an empty result clears prior original
-text after the placeholder has been replaced. This historical Phase 4 one-shot
-path is retained; Phase 6 Start/Stop now controls the real scheduler. Changed
-nonempty OCR text is translated when an online provider is selected.
+## 项目结构
 
-The initial backend is Tesseract (`tesseract` engine ID). Language IDs are
-`auto`, `zh`, `en`, `ja`, and `ko`; `auto` is an English `eng` fallback, not
-source-language detection. Phase 4.1 adds a Qt-only OCR preprocessor, conditional
-2x/3x smooth scaling, grayscale conversion, percentile contrast stretching,
-subtitle-oriented PSM 6/7 selection, explicit trained-data errors, and detailed
-Debug diagnostics. It does not force binary thresholding and does not add
-OpenCV or another OCR runtime.
-
-Tesseract 5.4 was manually verified with `eng` and `chi_sim`. The Japanese and
-Korean language mappings (`jpn`, `kor`) and missing-model diagnostics exist, but
-Japanese/Korean recognition quality has not been verified. Runtime and matching
-trained data are required on other machines. Packaging and trained-data
-distribution remain future work.
-
-Automated verification includes the Phase 2/3/4 regression suites and the
-`phase41_ocr_tuning` preprocessor/PSM/error suite. Manual tools generate
-temporary fixed-font samples and compare the same image with original RGB and
-optimized preprocessing. Real Bilibili subtitle tests found improvement on
-small ordinary text but poor reliability on artistic text, outlines, and
-complex moving backgrounds. See `docs/ocr-accuracy-phase41.md`. PaddleOCR or
-another scene-text backend should be evaluated later; it is not implemented in
-this phase.
-
-Run all checks with:
-
-```powershell
-cmake -S . -B .\build\mingw -G Ninja -DCMAKE_PREFIX_PATH="<Qt6 install prefix>"
-cmake --build .\build\mingw
-ctest --test-dir .\build\mingw --output-on-failure
+```text
+src/
+  main.cpp       应用初始化与模块连接
+  app/           输入模式、管线、生命周期和结果协调
+  audio/         麦克风、WASAPI、PCM 转换与语音端点检测
+  asr/           Whisper / Streaming ASR 接口、后端与 worker
+  capture/       屏幕选区与截图
+  config/        QSettings、音频、外观与快捷键配置
+  credentials/   Windows 安全凭据存储
+  gui/           字幕窗口、Settings 和 System Tray
+  ocr/           OCR 接口、引擎、预处理与运行时定位
+  processing/    帧比较与文本去重
+  translator/    翻译接口、Provider 工厂、语言映射与网络后端
+  platform/      Windows capture exclusion
+helpers/         常驻 OCR Python helper 与依赖清单
+tests/           自动化回归和本地验证工具
+tools/           OCR / Streaming ASR 评估工具
+scripts/         本地运行时准备、审计与包验证工具
+docs/            架构、测试数据与阶段验收文档
 ```
 
-Automated tests do not establish recognition quality on every font, video, or
-DPI configuration. `TranslatorOcrBenchmark` and
-`TranslatorOcrSampleGenerator` are manual test tools, not production pipeline
-components.
+模型、运行库和私有 QA 输入不属于源码目录，不随 Git 仓库提供。
 
-## 当前阶段
+## 技术栈与开发环境
 
-当前为 Phase 6.1B：已接入常驻 PP-OCRv6 Small helper，保留 Tesseract；完整连续视频与长期稳定性验收仍待完成。
+| 技术 | 使用方式 |
+| --- | --- |
+| C++17 / Qt 6 Widgets | 应用协调、透明字幕窗口和设置界面 |
+| Qt Core / Gui / Network / Multimedia | 事件、图像、异步翻译请求与麦克风采集 |
+| CMake / Ninja / MinGW | Windows 构建工具链 |
+| PaddleOCR / PaddlePaddle / PaddleX | 可选本地 Python OCR helper 运行时 |
+| Tesseract | 可选本地动态库和 traineddata |
+| whisper.cpp | 显式启用、固定源码版本的 CPU Final ASR |
+| sherpa-onnx / ONNX Runtime | 显式启用的 Streaming ASR SDK 与动态运行库 |
+| Windows WASAPI | 系统输出音频 loopback |
+| DeepL / OpenAI-compatible API | 可选在线翻译 |
 
-已实现：
-
-- Qt 6 application 和轻量 `TranslationWindow`
-- 无系统标题栏、始终置顶的透明字幕悬浮窗口
-- Region/Start/Stop/Settings/Close 工具栏
-- 独立 `SettingsDialog`
-- Source/Target Language 和 OCR/Translator engine 选择
-- 上方译文、下方原文的自动换行字幕区域
-- 高对比字幕文字与轻量阴影
-- 鼠标进入时显示、离开后隐藏的半透明工具栏
-- 启动时可见的双语 UI placeholder 与 hover 工具栏
-- Start/Stop 实时生命周期、会话 ID 和过期结果保护
-- 300ms 周期截图、帧差分、最新单帧 pending 和文本去重
-- 基于 `QSettings` 的配置持久化
-- 非法或过期配置的默认值回退
-- 悬浮窗口位置与尺寸恢复，以及屏幕外位置回退
-- 任意当前显示器内的单屏区域选择，支持反向拖动、Escape 取消
-- 基于 `QScreen::grabWindow()` 的一次性截图，得到 `QImage`
-- 上次有效 Region 与显示器名称持久化，失效区域启动时安全忽略
-- Qt 逻辑坐标和 High-DPI 截图像素尺寸记录
-- 可替换的 OCR 接口、Tesseract 后端和异步 `OcrCoordinator`
-- OCR 层内的放大、灰度化和对比度拉伸预处理
-- 面向单行/多行字幕的 PSM 7/6 动态选择
-- 输入/处理尺寸、语言资源、预处理和耗时 Debug 诊断
-- OCR 有效结果更新原文字幕；空结果可清除先前原文
-- 独立翻译接口、协调器、语言映射与 DeepL 后端
-- None/DeepL/OpenAI-Compatible 配置、QtNetwork 异步请求与过期响应保护
-- GUI API Key 配置、Windows Credential Manager、Provider Registry 与工厂
-
-## 尚未实现
-
-- 完整 Bilibili 连续字幕与桌面长期稳定性验收
-- Portable release acceptance / redistribution clearance (Phase 6.1C); installer is out of scope
-- Overlay click-through
-- Hook
-- TTS
-
-Region 按钮会选择并截取一次屏幕区域，然后发起一次本地 OCR；选择在线 Provider 时有效文字进入所配置的 API，None 不发送翻译请求。取消选择不会覆盖上次有效 Region。Debug 构建仅在本机系统临时目录覆盖保存一张 `Translator/last_capture.png` 供验证；Release 构建不写这张调试图。截图不会上传或写入仓库。
-
-## 当前 UI 架构
-
-应用启动后首先显示 `TranslationWindow`。语言和引擎配置不长期占用悬浮窗口，而是由工具栏的 Settings 按钮打开唯一的 `SettingsDialog`。两个窗口共享同一个 `SettingsManager`，所有配置继续由 `QSettings` 集中持久化。
-
-`TranslationWindow` 的主体背景完全透明，以 `QLabel` 显示居中的双层字幕：较大的译文在上，较小的原文在下。字幕使用高对比文字和阴影保持复杂背景下的基本可读性，不使用大型文本编辑框或背景面板。
-
-启动时译文和原文位置分别显示 `实时翻译将在这里显示` 与 `Original text appears here`，用于标示悬浮窗位置，不进入配置或业务管线。每个字段在首次收到非空真实内容时独立替换自己的 placeholder。
-
-半透明工具栏启动时可见；进入真实字幕状态后，鼠标进入整个悬浮窗时显示，真正离开窗口 400ms 后隐藏。placeholder 始终可见，因此窗口仍可被发现。窗口通过 Qt 原生 `QWindow::startSystemMove()` 支持从工具栏空白处或字幕区域拖动，并通过 `startSystemResize()` 支持边缘缩放。当前不启用鼠标穿透。
-
-`TranslationWindow` 通过 `regionSelectionRequested()` 请求选区，`CaptureCoordinator` 隐藏悬浮窗并启动 `RegionSelector`。选区 overlay 关闭后延迟一次短暂合成周期，再由 `ScreenCaptureService` 截取 `CaptureResult::image`，最后恢复悬浮窗。截图仅在单个 `QScreen` 内进行，不支持跨不同 DPI 显示器拖出一个区域。
+已验证环境：Windows 11、Qt 6.11.2、MinGW 13.1、CMake、Ninja。
+CMake 最低版本为 3.20；工程要求 Qt 6，上述版本是验证环境，不是跨版本兼容承诺。
+基础构建也需要 Qt Multimedia，不是仅安装 Core / Gui / Widgets 即可。
 
 ## 构建
 
-Phase 8D.1 提供独立的 `TranslatorStreamingAsrProbe`，仅用于本地流式 ASR 可行性验证，
-该历史阶段未接入正式 Translator。其状态为 **PARTIAL**，Phase 8D 仍保持 **PARTIAL**。
-测试结果、已知限制与显式本地依赖构建方式见
-[Streaming ASR Feasibility](docs/streaming-asr-feasibility-phase8d1.md)。
+### 基础构建
 
-Phase 8D.1A 的独立 Paraformer / Zipformer 准确率比较当前仍为 **PARTIAL**：
-固定 WAV、隔离 live loopback 和真实 Realtek 麦克风同一 PCM A/B 已完成。
-Zipformer 干净 loopback 10/10 正确、中文麦克风表现更好，但真实英语麦克风准确率仍不足；
-该准确率研究不宣称 production accuracy PASS，也未在该阶段接入正式 UI。
-Phase 8D.1 / Phase 8D 保持 PARTIAL；详见
-[Streaming ASR Accuracy](docs/streaming-asr-accuracy-phase8d1a.md)。
-
-Phase 8D.2 本地 production acceptance 为 **PASS**：可选 Zipformer 提供 live streaming
-original subtitles，现有 Whisper Final 修正原文并且只有 Final 进入翻译。
-正式 Translator.exe 的麦克风、英/中文 loopback、讲话结束前更新、静音、warm restart、
-Tray/ClickThrough 及 streaming / Whisper inference / DeepL pending 时退出验收已完成。
-普通 Release/Debug 各 26/26，Whisper 与双模型 Release/Debug 各 27/27 CTest PASS。
-不承诺即时或完美识别；英语麦克风识别错误仍为已知限制。
-Phase 8D 整体仍为 **PARTIAL**：streaming portable runtime、许可、clean-machine 与快捷键
-冲突等项目需独立收尾。本次仅提交验收文档，已测试的本地实现改动仍未提交。
-详见 [Production Streaming Original Subtitle](docs/streaming-original-production-phase8d2.md)。
-
-需要 CMake、Ninja、支持 C++17 的编译器，以及包含 Core、Gui、Widgets、Network 组件的 Qt 6 开发环境。Qt 安装位置通过标准 CMake 机制发现；必要时由构建者在命令行设置 `CMAKE_PREFIX_PATH` 或 `Qt6_DIR`，也可使用环境变量 `CMAKE_PREFIX_PATH`。Windows 上构建和运行时还需让对应 MinGW 与 Qt 的 `bin` 目录可从 `PATH` 找到。工程本身不硬编码本机安装路径。
+在已配置 MinGW 的 PowerShell 中执行，将占位符替换为本机安装位置：
 
 ```powershell
-cmake -S . -B .\build\mingw -G Ninja -DCMAKE_PREFIX_PATH="<Qt6 install prefix>"
-cmake --build .\build\mingw
+cmake -S . -B build/normal -G Ninja `
+  -DCMAKE_BUILD_TYPE=Release `
+  -DCMAKE_PREFIX_PATH="<QtPath>"
+cmake --build build/normal
+ctest --test-dir build/normal --output-on-failure
 ```
 
-运行自动化检查：
+`<QtPath>` 应指向匹配 MinGW 的 Qt kit。运行前确保 Qt 的 `bin`、MinGW 的 `bin` 和 Ninja
+可由 `PATH` 找到；程序输出为 `build/normal/Translator.exe`。也可用 Qt Creator 打开
+`CMakeLists.txt`，选择对应 kit 和 Translator 运行目标。
+
+基础构建支持 Screen UI 和 OCR 接入，但 OCR 运行时仍需准备。
+未启用 Whisper 的构建会提示语音识别不可用；构建成功不等于模型已安装。
+
+### 可选 ASR 支持
+
+完整双 ASR 构建需要准备固定版本的 whisper.cpp 源码、sherpa-onnx SDK 和 Windows DLL：
 
 ```powershell
-ctest --test-dir .\build\mingw --output-on-failure
+cmake -S . -B build/audio -G Ninja `
+  -DCMAKE_BUILD_TYPE=Release `
+  -DCMAKE_PREFIX_PATH="<QtPath>" `
+  -DTRANSLATOR_WHISPER_CPP_DIR="<whisper.cpp-path>" `
+  -DTRANSLATOR_SHERPA_ONNX_DIR="<sherpa-onnx-sdk-path>" `
+  -DTRANSLATOR_SHERPA_RUNTIME_DIR="<sherpa-onnx-runtime-path>"
+cmake --build build/audio
+ctest --test-dir build/audio --output-on-failure
 ```
 
-应用程序生成于 `build/mingw/Translator.exe`。
+Whisper 源码固定为 `48f628a84833905ee4a0658ee6d4a5c915ce1997`，CMake 会检查该版本。
+sherpa-onnx 为 1.13.8，ONNX Runtime 为 1.28.2；SDK 提供对应 C API headers 和 libraries。
+Windows runtime 目录需含 `sherpa-onnx-c-api.dll`、`onnxruntime.dll` 和
+`onnxruntime_providers_shared.dll`，CMake 将它们复制到 executable 目录。
+
+只配置 Whisper 参数可构建 Final-only 音频版本。Streaming 模型或 DLL 不可用时，
+完整版本明确提示 preview 不可用并保留 Whisper Final 路径。CMake 不自动下载依赖或模型。
+部分自动测试使用 Python；可追加 `-DPython3_EXECUTABLE="<python-executable>"`
+明确选择解释器，避免漏掉已有 Python 测试套件。
+
+**源码状态说明：** 本页描述已验收的当前工作树。Streaming production integration 的实现改动
+目前仍未提交；仅克隆当前已提交源码不能复现完整双 ASR 功能及新增构建参数。
+README 更新不会代替这些实现的提交。
+
+## 模型与本地运行时
+
+模型需自行准备；应用不会自动下载，权重和第三方 runtime 不提交 Git。
+缺失或不匹配的文件产生明确错误，不会从网络补齐。
+
+### OCR
+
+PP-OCRv6 Small 使用本地 det / rec 模型和 Python helper。依赖版本见
+[`helpers/ocr/requirements.txt`](helpers/ocr/requirements.txt)：PaddleOCR 3.7.0、
+PaddlePaddle 3.3.1、PaddleX 3.7.2。当前 Windows 配置明确禁用 MKL-DNN。
+
+开发运行可设置 `TRANSLATOR_OCR_PYTHON`、`TRANSLATOR_OCR_HELPER` 和
+`TRANSLATOR_OCR_MODELS`，分别指向 Python executable、helper 脚本和模型根目录。
+模型目录下需要 `PP-OCRv6_small_det/PP-OCRv6_small_det_infer/` 与
+`PP-OCRv6_small_rec/PP-OCRv6_small_rec_infer/`，各含 inference 配置与权重。
+既有本地包布局使用 executable 旁的 `ocr/runtime/`、`ocr/helper/`、`ocr/models/`；
+源码开发默认路径属于历史评估环境，不能视为已附带运行时。
+
+Tesseract 需匹配的动态库及 traineddata。其 `auto` 是 English fallback，
+不等于 OCR 自动语言检测；其他语言需要对应资源，实际可用性取决于运行时。
+
+### Final ASR
+
+已验证模型为 multilingual Whisper **ggml-base**。
+先检查 Settings 中的 ASR Model 路径，再检查 executable 旁的 `models/ggml-base.bin`。
+ASR language 与翻译 Source/Target Language 分开配置。
+
+### Streaming ASR
+
+已验证模型为 **sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20**，
+固定官方 int8 配方：encoder / joiner 为 int8，decoder 为 FP32。
+先查 `TRANSLATOR_STREAMING_MODEL_DIR`，再查 executable 旁的
+`models/streaming/zipformer/`；目录包含：
+
+```text
+encoder-epoch-99-avg-1.int8.onnx
+decoder-epoch-99-avg-1.onnx
+joiner-epoch-99-avg-1.int8.onnx
+tokens.txt
+```
+
+后端核对固定模型 hash。Streaming 当前面向中英文，不能将 Whisper 语言支持
+自动推导为 Zipformer 支持范围。模型来源和 identity 见下方 Streaming 验收文档。
+
+## 使用方法
+
+首次运行先打开 Settings，准备 OCR / ASR 资源并选择 Provider。
+使用 None 可以先验证本地识别；在线翻译还需要有效凭据和网络。
+
+### Screen
+
+1. 在 toolbar、tray 或 Settings 选择 Screen，配置 OCR Engine 和 Source/Target Language。
+2. 点击 Region，拖出字幕区域；Escape 可取消，过小选区不会保存。
+3. 点击 Start，持续显示原文及可选翻译；Stop 结束，再次 Start 使用有效保存选区。
+
+### Microphone
+
+1. 在 Settings 选择 Microphone Device、ASR Model、ASR language 和翻译配置。
+2. 选择 Microphone，Start 后等待模型就绪和 Listening。
+3. 讲话时观察 Original；完整 Streaming 配置下，原文随语音更新。
+4. 句段结束后 Whisper Final 更新原文，Provider 随后显示译文；Stop 停止采集。
+
+### System Audio
+
+1. 在 Settings 选择 Output Device，确认播放程序使用该设备，配置 ASR 与语言。
+2. 选择 System Audio，点击 Start，然后播放音频或视频。
+3. 查看 Streaming Original 和句末 Final / 翻译；Stop 结束 loopback，不会打开麦克风。
+
+启动只恢复模式选择，不自动采集。音频模式禁用 Region，更改音频配置后应 Stop/Start。
+Hide 仅隐藏窗口，Close 或 Tray Exit 才退出并清理 worker / helper。
+
+## 设置与翻译配置
+
+Settings 提供 Input Mode、OCR Engine、Source/Target Language、Translation Provider、
+Microphone/Output Device、Whisper ASR Model、ASR language、Appearance 和 Shortcuts。
+配置由 QSettings 持久化，API key 不写入 QSettings。
+
+- **DeepL：** 选择 Free/Pro，通过 Configure / Replace 输入 key，再 Apply/OK。
+- **OpenAI Compatible：** 填 API Base URL、实际 Model ID 和 key；Base URL 不是完整
+  `/chat/completions` 地址，程序会追加该路径。
+- **None：** 不发翻译请求，保留本地识别与原文显示。
+
+Windows key 存入 Credential Manager。DeepL 支持 `DEEPL_API_KEY` 环境变量作为
+已保存 GUI 凭据之后的 fallback；不要将 key 写入仓库。
+OpenAI-compatible 使用非 streaming Chat Completions，不保证适配所有模型或服务；
+远端要求 HTTPS，仅 loopback host 可用 HTTP，当前仍要求 API key。
+
+## 快捷键
+
+| 默认快捷键 | 功能 |
+| --- | --- |
+| Ctrl+Alt+T | 切换 Interactive / ClickThrough |
+| Ctrl+Alt+R | Screen 模式选择 Region |
+| Ctrl+Alt+S | 当前输入的 Start / Stop |
+
+三组全局快捷键可在 Settings 配置并保存。Windows 注册可能与其他软件冲突；
+可改用其他组合，或使用 toolbar / tray，不假定默认键在所有机器均可用。
+
+## 隐私与数据处理
+
+OCR / ASR 在本地运行。启动不会自动打开麦克风，只有 Start Microphone 才开始采集。
+正常识别不保存录音；Debug 截图在本机临时目录覆盖保存一张调试图，Release 不写该图。
+显式启用诊断可能记录识别文本，调试文件应按内容隐私妥善处理。
+
+DeepL / OpenAI-compatible 将识别后的**文本**发送至对应服务，不是原始屏幕图片或音频。
+在线翻译受服务隐私规则、网络和额度影响，不能称整个应用 100% offline。
+Provider None 在模型和 runtime 已备妥时可以只做本地识别。
+
+## 当前验证状态
+
+PASS 指已记录的环境与用例通过，不是通用准确率或所有设备兼容保证。
+
+| 功能 | 验证状态 |
+| --- | --- |
+| Screen Region / 周期 OCR / 去重 | 核心链与自动回归通过；完整连续视频长期覆盖有限 |
+| PP-OCRv6 Small / OCR 到翻译字幕 | PASS；真实字幕及 helper 生命周期已验证 |
+| 麦克风与 WASAPI loopback capture | PASS；已测试设备范围 |
+| 英/中文 Streaming Original | PASS；正式应用讲话/播放结束前显示原文 |
+| Whisper Final correction / Final-only translation | PASS；实测与身份顺序自动测试 |
+| 静音、Stop/Restart、warm model reuse | PASS |
+| Streaming / Whisper inference / 翻译 pending 时退出 | PASS；未发现残留 Translator 进程 |
+| ClickThrough、Drag Lock、Tray 与基本外观 | Core PASS；环境专属检查仍有未覆盖项 |
+
+最近完整回归：普通 Release/Debug 各 **26/26**，Whisper Release/Debug 各 **27/27**，
+Zipformer + Whisper Release/Debug 各 **27/27**。标准 CTest 不依赖真实模型、麦克风或在线
+凭据；真实输入质量由单独人工测试记录。
+
+## 已知限制
+
+- Partial 随后续声音修正，短词可能等到 Final 才显示，不能保证即时出字。
+- ASR 受麦克风、噪声、口音和发音影响；英语麦克风测试仍有明显错误。
+- Energy-based endpointing 不能语义区分音乐、噪声和语音，停顿可能将长句分段。
+- 无字幕复杂背景偶尔产生 OCR 短字符误识别，未宣称此问题已修复。
+- 快捷键可能被其他应用占用。DPI、多显示器和其他硬件只按实际验证范围负责；
+  Region 限于单屏，不支持跨不同 DPI 显示器拖选。
+- Capture exclusion 依赖 Windows 与截图 API，是 best effort，不是安全或 DRM 保证。
+- 双 ASR 增加内存与 CPU 开销；翻译受网络影响，Final 并非始终准确。
+- 模型和第三方 runtime 不随 Git 提供，不承诺任意版本或未验证语言的质量。
+- Public installer、公开再分发及完整 clean-machine release engineering 不属于当前项目范围。
+
+## 开发与验收文档
+
+详细设计、测试数据与历史记录见 [`docs/`](docs/)，主要入口：
+
+- [实时屏幕 OCR 管线](docs/realtime-pipeline-phase6.md)
+- [常驻 PP-OCRv6 Small helper](docs/ocr-helper-phase61b.md)
+- [音频翻译管线](docs/audio-translation-pipeline-phase8c.md)
+- [Streaming ASR 模型比较](docs/streaming-asr-accuracy-phase8d1a.md)
+- [双 ASR 实时字幕与最终验收](docs/streaming-original-production-phase8d2.md)
+
+## License / Third-party Notice
+
+仓库当前未提交项目级 LICENSE，不应将可查看源码理解为已授予任意使用或再分发许可。
+参考 LunaTranslator、采用独立工程，并不自动排除许可证审查义务。
+
+Qt 获取方式为官方开源版，使用 open-source LGPLv3 选项并动态链接，不主张 Qt Commercial
+License。Qt、模型、Python packages、Whisper、sherpa-onnx、ONNX Runtime 及 Windows runtime
+各有许可与 notice 要求，功能验收不替代这些义务。
+当前[第三方运行时许可清单](docs/third-party-runtime-licenses.md)仍含待审查项，
+本页不更改项目许可证、不宣称 public redistribution cleared，也不构成法律意见。
+
+## 项目状态
+
+课程项目范围内功能开发已完成，核心功能验收通过。公开发行包、Installer、完整第三方
+再分发及发行工程明确为 Out of Scope；历史验收文档中的 PARTIAL / PENDING 按原记录保留，
+不自动改为 PASS。本 README 不另行引入新的开发路线。
