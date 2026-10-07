@@ -1,6 +1,18 @@
 # Realtime Audio Translation Pipeline - Phase 8C
 
-## Acceptance and Scope
+## Phase 8C.1 Follow-Up
+
+Current Core Acceptance: **PASS for the explicitly tested Realtek microphone and
+system loopback** after owner-confirmed single-reading microphone A/B and actual
+loopback/DeepL/warm-lifecycle tests. Default audio segmentation now uses independent
+RMS endpointing, not fixed 4-second windows. See
+[Phase 8C.1 architecture, live A/B and limitations](speech-endpointing-phase8c1.md).
+Ordinary startup remains OCR-only; complete Audio UX/packaging and Phase 8D are not
+started. The following Phase 8C record is historical: its original PARTIAL status,
+fixed cuts, inaccurate microphone outputs and old test counts are intentionally
+retained, not relabeled as successful evidence.
+
+## Historical Phase 8C Acceptance and Scope
 
 Baseline: `95ef8a0e864eda71aec8c24257c218ad83c8d09a`; the requested Phase 8A
 acceptance commit is in history. Work is confined to Translator. No subagents,

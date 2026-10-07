@@ -2,6 +2,7 @@
 #include "audio/AudioInputCoordinator.h"
 #include "asr/AsrCoordinator.h"
 #include "app/TranslationCoordinator.h"
+#include "audio/SpeechEndpointDetector.h"
 #include <QElapsedTimer>
 #include <optional>
 
@@ -9,6 +10,7 @@ class AudioTranslationCoordinator final : public QObject
 {
     Q_OBJECT
 public:
+    enum class Segmentation { Energy, LegacyFixed };
     struct Configuration {
         Audio::InputKind kind = Audio::InputKind::Microphone;
         QByteArray deviceId;
@@ -16,6 +18,8 @@ public:
         QString translationSource = QStringLiteral("auto");
         QString translationTarget = QStringLiteral("zh");
         int segmentMs = 4000;
+        Segmentation segmentation = Segmentation::Energy;
+        SpeechEndpointConfig endpoint;
     };
     AudioTranslationCoordinator(AudioInputCoordinator &audio, AsrCoordinator &asr,
                                 TranslationCoordinator &translation, QObject *parent = nullptr);
@@ -25,9 +29,13 @@ public:
     void finalizeBoundary();
     bool isRunning() const { return running_; }
     quint64 session() const { return session_; }
-    int bufferedChunks() const { return int(current_.size() + (pending_ ? pending_->chunks.size() : 0)); }
+    int bufferedChunks() const { return int(current_.size() + detector_.bufferedChunks() + (pending_ ? pending_->chunks.size() : 0)); }
     quint64 droppedSegments() const { return dropped_; }
 signals:
+    void endpointEvent(const QString &event);
+    void endpointDetails(double rms, double noiseFloor, double startThreshold, int state);
+    void latencyMeasured(quint64 session, quint64 utterance, const QString &stage,
+                         qint64 speechEndUs, qint64 boundaryUs, qint64 nowUs, qint64 processingMs);
     void runningChanged(bool running);
     void originalTextReady(const QString &text);
     void translatedTextReady(const QString &text);
@@ -38,7 +46,9 @@ signals:
     void translationFinished(quint64 session, quint64 utterance, const TranslationResult &result,
                              qint64 postBoundaryMs);
 private:
-    struct Segment { quint64 id; QList<Audio::PcmChunk> chunks; qint64 boundaryUs; };
+    struct Segment { quint64 id; QList<Audio::PcmChunk> chunks; qint64 boundaryUs; qint64 speechEndUs; };
+    void seal(QList<Audio::PcmChunk> chunks, qint64 speechEndUs);
+    void consumeEndpoint(SpeechEndpointDetector::Utterance utterance);
     void receivePcm(const Audio::PcmChunk &chunk);
     void dispatch();
     void receiveAsr(const Asr::Result &result);
@@ -47,6 +57,7 @@ private:
     AsrCoordinator &asr_;
     TranslationCoordinator &translation_;
     Configuration configuration_;
+    SpeechEndpointDetector detector_;
     QTimer boundary_, dispatchTimer_;
     QList<Audio::PcmChunk> current_;
     std::optional<Segment> pending_, active_;
@@ -54,5 +65,6 @@ private:
     quint64 asrSession_ = 0, asrUtterance_ = 0, displayed_ = 0;
     quint64 requestId_ = 0, requestUtterance_ = 0, requestSession_ = 0, dropped_ = 0;
     qint64 requestBoundaryUs_ = 0;
+    qint64 requestSpeechEndUs_ = 0, legacySpeechEndUs_ = 0;
     bool running_ = false, submitting_ = false, prepared_ = false;
 };

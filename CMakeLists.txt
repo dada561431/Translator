@@ -118,6 +118,7 @@ if(WIN32)
 endif()
 
 add_library(TranslatorAudioPipeline STATIC
+    src/audio/SpeechEndpointDetector.h src/audio/SpeechEndpointDetector.cpp
     src/app/AudioTranslationCoordinator.h src/app/AudioTranslationCoordinator.cpp
     src/app/InputPipelineController.h
     src/app/TranslationCoordinator.h src/app/TranslationCoordinator.cpp
@@ -175,6 +176,9 @@ set_target_properties(Translator PROPERTIES
 include(CTest)
 
 if(BUILD_TESTING)
+    add_executable(TranslatorSpeechEndpointTests tests/SpeechEndpointDetectorTest.cpp)
+    target_link_libraries(TranslatorSpeechEndpointTests PRIVATE TranslatorAudioPipeline)
+    add_test(NAME phase8c1_speech_endpoint COMMAND TranslatorSpeechEndpointTests)
     add_executable(TranslatorAudioTranslationTests tests/AudioTranslationTest.cpp
         src/gui/TranslationWindow.cpp src/gui/TranslationWindow.h
         src/gui/SettingsDialog.cpp src/gui/SettingsDialog.h)

@@ -7,11 +7,17 @@ AudioTranslationCoordinator::AudioTranslationCoordinator(AudioInputCoordinator &
 {
     connect(&boundary_, &QTimer::timeout, this, &AudioTranslationCoordinator::finalizeBoundary);
     dispatchTimer_.setInterval(20);
-    connect(&dispatchTimer_, &QTimer::timeout, this, &AudioTranslationCoordinator::dispatch);
+    connect(&dispatchTimer_, &QTimer::timeout, this, [this] {
+        if (running_ && configuration_.segmentation == Segmentation::Energy) {
+            if (auto utterance = detector_.advanceTime(Audio::monotonicUs())) consumeEndpoint(std::move(*utterance));
+        }
+        dispatch();
+    });
     connect(&audio_, &AudioInputCoordinator::pcmReady, this, &AudioTranslationCoordinator::receivePcm);
     connect(&audio_, &AudioInputCoordinator::stateChanged, this, [this](Audio::State state) {
         if (!running_) return;
-        if (state == Audio::State::Running) boundary_.start(configuration_.segmentMs);
+        if (state == Audio::State::Running && configuration_.segmentation == Segmentation::LegacyFixed)
+            boundary_.start(configuration_.segmentMs);
         else if (state == Audio::State::Stopped) {
             stop(); emit feedback(QStringLiteral("Audio capture stopped or device unavailable."));
         }
@@ -37,6 +43,9 @@ AudioTranslationCoordinator::AudioTranslationCoordinator(AudioInputCoordinator &
         requestId_ = 0;
         const auto generation = session_;
         const auto utterance = requestUtterance_;
+        emit latencyMeasured(generation, utterance, QStringLiteral("translation"), requestSpeechEndUs_,
+                             requestBoundaryUs_, Audio::monotonicUs(), result.elapsedMs);
+        if (!running_ || session_ != generation || displayed_ != utterance) return;
         emit translationFinished(generation, requestUtterance_, result,
                                  (Audio::monotonicUs() - requestBoundaryUs_) / 1000);
         if (!running_ || session_ != generation || displayed_ != utterance) return;
@@ -49,7 +58,9 @@ bool AudioTranslationCoordinator::start(const Configuration &configuration)
 {
     Q_ASSERT(thread() == QThread::currentThread());
     if (running_) return false;
-    if (asr_.state() != Asr::State::Ready || configuration.segmentMs < 100
+    if (asr_.state() != Asr::State::Ready || !configuration.endpoint.valid()
+        || (configuration.segmentation != Segmentation::Energy && configuration.segmentation != Segmentation::LegacyFixed)
+        || configuration.segmentMs < 100
         || configuration.segmentMs > 30000 || !Asr::supportedLanguage(configuration.asr.language)
         || configuration.asr.timeoutMs <= 0 || configuration.asr.threads < 1 || configuration.asr.threads > 64
         || !Asr::supportedLanguage(configuration.translationSource)
@@ -59,6 +70,8 @@ bool AudioTranslationCoordinator::start(const Configuration &configuration)
         return false;
     }
     configuration_ = configuration; ++session_; current_.clear(); pending_.reset(); active_.reset();
+    detector_.configure(configuration.endpoint); legacySpeechEndUs_ = 0;
+    emit endpointEvent(QStringLiteral("detector_reset"));
     displayed_ = requestId_ = dropped_ = 0;
     translation_.invalidate(false);
     running_ = true;
@@ -76,26 +89,57 @@ void AudioTranslationCoordinator::stop()
     if (!running_) return;
     running_ = false; ++session_; boundary_.stop(); dispatchTimer_.stop();
     audio_.stop(); asr_.cancelUtterance(); current_.clear(); pending_.reset(); active_.reset();
+    detector_.reset(); legacySpeechEndUs_ = requestSpeechEndUs_ = 0;
     requestId_ = 0; submitting_ = prepared_ = false; translation_.invalidate(false);
     emit runningChanged(false);
+    emit endpointEvent(QStringLiteral("detector_reset"));
 }
 void AudioTranslationCoordinator::receivePcm(const Audio::PcmChunk &chunk)
 {
     if (!running_ || chunk.session != audioSession_) return;
     const auto generation = session_;
     if (chunk.samples.size() != Audio::ChunkBytes) { emit feedback(QStringLiteral("Invalid PCM chunk rejected.")); return; }
+    auto observation = detector_.consume(chunk, Audio::monotonicUs());
+    emit endpointDetails(observation.rms, observation.noiseFloor, observation.startThreshold, int(observation.state));
+    if (!running_ || session_ != generation) return;
+    if (observation.reset) emit endpointEvent(QStringLiteral("detector_reset"));
+    if (observation.started) emit endpointEvent(QStringLiteral("SpeechStarted"));
+    if (!running_ || session_ != generation) return;
+    if (configuration_.segmentation == Segmentation::Energy) {
+        if (observation.ended) consumeEndpoint(std::move(*observation.ended));
+        return;
+    }
+    // Legacy QA uses the same energy rule only to estimate last-active time, not to gate ASR.
+    if (observation.rms >= observation.startThreshold * configuration_.endpoint.endRatio)
+        legacySpeechEndUs_ = observation.chunkEndUs;
     // Cap a stalled event-loop window at 30 seconds without silently extending an utterance.
     if (current_.size() >= 1500) finalizeBoundary();
     if (running_ && generation == session_) current_.append(chunk);
 }
 void AudioTranslationCoordinator::finalizeBoundary()
 {
-    if (!running_ || current_.isEmpty()) return;
+    if (!running_ || configuration_.segmentation != Segmentation::LegacyFixed || current_.isEmpty()) return;
+    auto chunks = std::move(current_); current_.clear();
+    const auto speechEnd = legacySpeechEndUs_; legacySpeechEndUs_ = 0;
+    seal(std::move(chunks), speechEnd);
+}
+void AudioTranslationCoordinator::consumeEndpoint(SpeechEndpointDetector::Utterance utterance)
+{
     const auto generation = session_;
-    Segment segment{++nextUtterance_, std::move(current_), Audio::monotonicUs()}; current_.clear();
+    emit endpointEvent(utterance.forced ? QStringLiteral("ForcedMaxDuration") : QStringLiteral("SpeechEnded"));
+    if (running_ && session_ == generation) seal(std::move(utterance.chunks), utterance.speechEndUs);
+}
+void AudioTranslationCoordinator::seal(QList<Audio::PcmChunk> chunks, qint64 speechEndUs)
+{
+    if (!running_ || chunks.isEmpty()) return;
+    const auto generation = session_;
+    Segment segment{++nextUtterance_, std::move(chunks), Audio::monotonicUs(), speechEndUs};
     if (pending_) { ++dropped_; emit feedback(QStringLiteral("ASR backpressure: oldest pending segment dropped.")); }
     if (!running_ || session_ != generation) return;
     pending_ = std::move(segment);
+    emit latencyMeasured(generation, pending_->id, QStringLiteral("boundary"), speechEndUs,
+                         pending_->boundaryUs, pending_->boundaryUs, 0);
+    if (!running_ || session_ != generation || !pending_) return;
     emit segmentFinalized(generation, pending_->id, pending_->chunks.size() * 20);
     if (running_ && session_ == generation) dispatch();
 }
@@ -120,6 +164,9 @@ void AudioTranslationCoordinator::receiveAsr(const Asr::Result &result)
         || result.kind != Asr::ResultKind::Final) return;
     const auto segment = std::move(*active_); active_.reset();
     const auto generation = session_;
+    emit latencyMeasured(generation, segment.id, QStringLiteral("asr_final"), segment.speechEndUs,
+                         segment.boundaryUs, Audio::monotonicUs(), result.processingMs);
+    if (!running_ || session_ != generation) return;
     emit finalReady(generation, segment.id, result);
     if (!running_ || session_ != generation) return;
     if (!result.text.trimmed().isEmpty()) {
@@ -128,6 +175,7 @@ void AudioTranslationCoordinator::receiveAsr(const Asr::Result &result)
         emit originalTextReady(result.text);
         if (!running_ || session_ != generation) return;
         requestSession_ = generation; requestUtterance_ = segment.id; requestBoundaryUs_ = segment.boundaryUs;
+        requestSpeechEndUs_ = segment.speechEndUs;
         submitting_ = true;
         translation_.acceptText(result.text, configuration_.translationSource, configuration_.translationTarget);
         submitting_ = false;

@@ -6,6 +6,7 @@
 #include <QSettings>
 #include <QElapsedTimer>
 #include <QThread>
+#include <QtEndian>
 #include <atomic>
 #include <iostream>
 #include "config/SettingsManager.h"
@@ -76,6 +77,7 @@ int main(int argc, char **argv)
         QObject::connect(&pipeline, &AudioTranslationCoordinator::originalTextReady, &window, &TranslationWindow::setOriginalText);
         QObject::connect(&pipeline, &AudioTranslationCoordinator::translatedTextReady, &window, &TranslationWindow::setTranslatedText);
         AudioTranslationCoordinator::Configuration config; config.segmentMs = 1000;
+        config.segmentation = AudioTranslationCoordinator::Segmentation::LegacyFixed;
         config.translationSource = "en"; config.translationTarget = "zh";
         QString original, translated; int originals = 0, finals = 0, errors = 0, boundaries = 0;
         Asr::Result last;
@@ -87,6 +89,9 @@ int main(int argc, char **argv)
         check(!pipeline.isRunning() && !input && stats->loads == 0, "initial stopped/privacy");
         check(!pipeline.start(config), "model required before capture");
         asr.loadModel("fake"); check(wait([&] { return asr.state() == Asr::State::Ready; }), "model ready");
+        auto invalidMode = config;
+        invalidMode.segmentation = static_cast<AudioTranslationCoordinator::Segmentation>(99);
+        check(!pipeline.start(invalidMode) && !input, "invalid segmentation rejected before capture");
         bool ocr = true; int ocrStops = 0;
         InputPipelineController modes(pipeline, {[&] { ocr = true; }, [&] { ocr = false; ++ocrStops; }, [&] { return ocr; }});
         modes.select(InputPipelineController::Mode::AudioMicrophone);
@@ -164,6 +169,35 @@ int main(int argc, char **argv)
         emit input->errorOccurred({Audio::ErrorCode::DeviceUnavailable, "unplugged", {}});
         check(wait([&] { return !pipeline.isRunning(); }), "device failure stops pipeline");
         check(asr.state() == Asr::State::Ready && stats->loads == 1, "failure keeps model reusable");
+        config.segmentation = AudioTranslationCoordinator::Segmentation::Energy;
+        settings.setTranslator("deepl");
+        check(pipeline.start(config), "energy pipeline start");
+        wait([&] { return audio.state() == Audio::State::Running; });
+        const auto beforeCalls = stats->calls.load(); const auto beforeRequests = translator->requests.size();
+        quint64 energySeq = 0;
+        // Owner-thread injection exercises pipeline boundaries independently of capture mailbox rate.
+        const auto origin = Audio::monotonicUs();
+        auto energy = [&](int chunks, qint16 sample) {
+            QByteArray pcm(640, '\0');
+            for (int i = 0; i < 320; ++i) qToLittleEndian<qint16>(i % 2 ? sample : -sample, pcm.data() + i * 2);
+            for (int i = 0; i < chunks; ++i) {
+                emit audio.pcmReady({pcm, audio.session(), energySeq, origin + qint64(energySeq) * 20000, false}); ++energySeq;
+            }
+        };
+        energy(500, 0); QCoreApplication::processEvents();
+        check(pipeline.isRunning() && stats->calls == beforeCalls && translator->requests.size() == beforeRequests,
+              "10 seconds energy silence: zero ASR/translation, still Running");
+        stats->hold = true; energy(15, 1000); energy(30, 0);
+        check(wait([&] { return asr.isBusy(); }), "endpoint-driven Final dispatch");
+        preview.session = asr.session(); preview.utterance = asr.utterance(); emit asr.resultReady(preview);
+        check(translator->requests.size() == beforeRequests, "endpoint Partial yields zero translations");
+        stats->hold = false; check(wait([&] { return translator->requests.size() == beforeRequests + 1; }), "endpoint Final exactly one translation");
+        emit asr.resultReady(last); check(translator->requests.size() == beforeRequests + 1, "endpoint duplicate Final rejected");
+        const auto beforeCancel = stats->calls.load(); energy(15, 1000); pipeline.stop();
+        check(stats->calls == beforeCancel && pipeline.bufferedChunks() == 0, "Stop during speech cancels without ASR");
+        check(pipeline.start(config) && pipeline.bufferedChunks() == 0 && stats->loads == 1, "energy restart Idle/empty/warm");
+        pipeline.stop();
+        config.segmentation = AudioTranslationCoordinator::Segmentation::LegacyFixed;
         pipeline.start(config); wait([&] { return audio.state() == Audio::State::Running; });
         seq = 0; stats->hold = true; feed(); pipeline.finalizeBoundary();
         check(wait([&] { return asr.isBusy(); }), "shutdown during active inference");

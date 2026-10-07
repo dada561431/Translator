@@ -4,17 +4,25 @@
 
 ## Phase 8C Realtime Audio Translation Pipeline
 
-**Phase 8C: PARTIAL; complete Core Acceptance is not claimed.** Independent
+**Phase 8C.1 endpointing and Phase 8C Core Acceptance: PASS for the tested Realtek
+microphone and system loopback.** Independent
 `AudioTranslationCoordinator` joins real microphone / WASAPI capture, persistent
 whisper.cpp, Final-only `TranslationCoordinator` routing and the existing subtitle
 window through an explicit QA entry. Ordinary startup remains OCR-only and never
 opens an audio device. No new mode/model/device UI or audio packaging is included.
 
-Real loopback produced 7 Finals / 7 successful DeepL translations; five warm
-restarts retained one model load. Real Realtek microphone delivered 14 Finals and
-14 translations, but the owner reports English recognition was inaccurate:
-microphone semantic acceptance remains pending, not relabeled PASS. Standard
-Release/Debug pass 22/22 CTest; whisper-enabled Release/Debug pass 23/23.
+Phase 8C's initial inaccurate microphone test remains documented as historical
+PARTIAL evidence. Phase 8C.1 now uses independent RMS endpointing with pre-roll,
+600 ms trailing silence and a 12-second safety cap; legacy 4s remains QA-only.
+The owner confirmed six individually spoken English prompts were correctly
+recognized in the tuned energy run, with six real DeepL subtitle translations.
+Speech-end -> Final median was 1415 ms; end -> translation median 1741.5 ms.
+Live loopback recognized the full official short speech fixture, produced no
+periodic silent Finals, and six Stop/Start cycles retained one model load.
+Normal Release/Debug pass 23/23 CTest; whisper-enabled Release/Debug pass 24/24.
+Energy detection cannot classify music/noise; other gains/devices need their own
+acceptance. This is not universal ASR accuracy or complete low-latency Audio UX.
+See [Phase 8C.1 parameters, actual A/B, tests and limitations](docs/speech-endpointing-phase8c1.md).
 See [Phase 8C architecture, evidence and limitations](docs/audio-translation-pipeline-phase8c.md).
 Phase 8D is not started.
 
