@@ -474,16 +474,26 @@ Region 按钮会选择并截取一次屏幕区域，然后发起一次本地 OCR
 ## 构建
 
 Phase 8D.1 提供独立的 `TranslatorStreamingAsrProbe`，仅用于本地流式 ASR 可行性验证，
-尚未接入正式 Translator。当前状态为 **PARTIAL**，Phase 8D 仍保持 **PARTIAL**。
+该历史阶段未接入正式 Translator。其状态为 **PARTIAL**，Phase 8D 仍保持 **PARTIAL**。
 测试结果、已知限制与显式本地依赖构建方式见
 [Streaming ASR Feasibility](docs/streaming-asr-feasibility-phase8d1.md)。
 
 Phase 8D.1A 的独立 Paraformer / Zipformer 准确率比较当前仍为 **PARTIAL**：
 固定 WAV、隔离 live loopback 和真实 Realtek 麦克风同一 PCM A/B 已完成。
 Zipformer 干净 loopback 10/10 正确、中文麦克风表现更好，但真实英语麦克风准确率仍不足；
-不宣称 production accuracy PASS，不接入正式 UI。Phase 8D.1 / Phase 8D 保持 PARTIAL。
-正式 Translator 不使用这些 QA streaming 模型；详见
+该准确率研究不宣称 production accuracy PASS，也未在该阶段接入正式 UI。
+Phase 8D.1 / Phase 8D 保持 PARTIAL；详见
 [Streaming ASR Accuracy](docs/streaming-asr-accuracy-phase8d1a.md)。
+
+Phase 8D.2 本地 production acceptance 为 **PASS**：可选 Zipformer 提供 live streaming
+original subtitles，现有 Whisper Final 修正原文并且只有 Final 进入翻译。
+正式 Translator.exe 的麦克风、英/中文 loopback、讲话结束前更新、静音、warm restart、
+Tray/ClickThrough 及 streaming / Whisper inference / DeepL pending 时退出验收已完成。
+普通 Release/Debug 各 26/26，Whisper 与双模型 Release/Debug 各 27/27 CTest PASS。
+不承诺即时或完美识别；英语麦克风识别错误仍为已知限制。
+Phase 8D 整体仍为 **PARTIAL**：streaming portable runtime、许可、clean-machine 与快捷键
+冲突等项目需独立收尾。本次仅提交验收文档，已测试的本地实现改动仍未提交。
+详见 [Production Streaming Original Subtitle](docs/streaming-original-production-phase8d2.md)。
 
 需要 CMake、Ninja、支持 C++17 的编译器，以及包含 Core、Gui、Widgets、Network 组件的 Qt 6 开发环境。Qt 安装位置通过标准 CMake 机制发现；必要时由构建者在命令行设置 `CMAKE_PREFIX_PATH` 或 `Qt6_DIR`，也可使用环境变量 `CMAKE_PREFIX_PATH`。Windows 上构建和运行时还需让对应 MinGW 与 Qt 的 `bin` 目录可从 `PATH` 找到。工程本身不硬编码本机安装路径。
 
