@@ -8,12 +8,17 @@
 #include <QStringList>
 #include "config/OverlayAppearance.h"
 #include "config/GlobalHotkeyConfig.h"
+#include "config/AudioSettings.h"
 
 class SettingsManager final : public QObject
 {
     Q_OBJECT
 public:
     SettingsManager();
+    QString inputMode() const;
+    void setInputMode(const QString &mode);
+    AudioSettings audioSettings() const;
+    void setAudioSettings(AudioSettings configuration);
 
     QString sourceLanguage();
     QString targetLanguage();
@@ -49,6 +54,8 @@ public:
     void setCaptureRegion(const QRect &region, const QString &screenName);
 
 signals:
+    void inputModeChanged();
+    void audioSettingsChanged();
     void translationSettingsChanged();
     void overlayAppearanceChanged();
     void overlayDragLockedChanged();

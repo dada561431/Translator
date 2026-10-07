@@ -2,6 +2,7 @@
 #include <QObject>
 #include <functional>
 #include <memory>
+#include <QList>
 class QAction;
 class QMenu;
 class QSystemTrayIcon;
@@ -25,4 +26,5 @@ private:
     std::unique_ptr<QMenu> menu_;
     std::unique_ptr<QSystemTrayIcon> icon_;
     QAction *visibility_, *interaction_, *lock_, *region_, *realtime_, *settings_, *exit_;
+    QList<QAction *> modes_;
 };

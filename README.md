@@ -2,7 +2,34 @@
 
 `Translator` 是一个基于 Qt 6、C++17 和 Qt Widgets 的实时屏幕文字识别与翻译程序。本项目参考 LunaTranslator 的架构和功能设计，但采用独立的 Qt 6/C++ 实现；原 LunaTranslator 源码保持独立且不受本工程影响。
 
-## Phase 8C Realtime Audio Translation Pipeline
+## Phase 8D Audio Productization Candidate
+
+**Phase 8D / Phase 8 Overall Core Acceptance: PARTIAL.** Production input-mode
+controls, audio Settings and local runtime deployment are implemented. Ordinary
+Release/Debug each pass **24/24** CTest suites; Whisper-enabled Release/Debug each
+pass **25/25**. The local candidate starts without the development Qt PATH and
+passes its Paddle runtime self-check (20/20); static dependency audit: zero missing.
+Production microphone/loopback/DeepL subtitle acceptance and the new audio
+candidate's clean Windows acceptance are still **PENDING**, not inherited from
+older Probe or OCR-only Sandbox results. Public redistribution remains pending
+owner/license review; no public ZIP or installer is produced.
+
+Candidate usage (requires a Whisper-enabled build and local model):
+
+1. Configure the translation provider in Settings; None enables transcription only.
+2. Configure a local speech model, or put `ggml-base.bin` beside the application in `models/`.
+3. Select the microphone/output device and speech recognition language in Settings, then Apply.
+4. Select Screen, Microphone or System Audio in the toolbar or tray, then Start.
+5. Stop explicitly. Changing input mode stops the old pipeline and never starts listening automatically.
+
+Audio Region is disabled. Model loading is asynchronous; Stop retains the warm
+model. Changed audio configuration takes effect on the next Stop/Start. Startup
+restores selection only, never Running. No audio is recorded and no model is
+automatically downloaded. Current host: Ctrl+Alt+S registration encountered an
+existing shortcut conflict (Win32 1409); foreground shortcut acceptance is pending.
+See [Phase 8D implementation, packaging, acceptance ledger and remaining checks](docs/audio-productization-phase8d.md).
+
+## Historical Phase 8C Realtime Audio Translation Pipeline
 
 **Phase 8C.1 endpointing and Phase 8C Core Acceptance: PASS for the tested Realtek
 microphone and system loopback.** Independent
@@ -24,7 +51,7 @@ Energy detection cannot classify music/noise; other gains/devices need their own
 acceptance. This is not universal ASR accuracy or complete low-latency Audio UX.
 See [Phase 8C.1 parameters, actual A/B, tests and limitations](docs/speech-endpointing-phase8c1.md).
 See [Phase 8C architecture, evidence and limitations](docs/audio-translation-pipeline-phase8c.md).
-Phase 8D is not started.
+These Phase 8C results are historical component/Probe evidence, not Phase 8D production UI acceptance.
 
 ## Phase 8B Local ASR Backend
 

@@ -6,6 +6,39 @@
 #include <QFont>
 #include <cmath>
 
+QString SettingsManager::inputMode() const
+{
+    const auto mode = settings_.value(QStringLiteral("input/mode"), QStringLiteral("screen")).toString();
+    return mode == QLatin1String("microphone") || mode == QLatin1String("system-audio") ? mode : QStringLiteral("screen");
+}
+void SettingsManager::setInputMode(const QString &mode)
+{
+    if (mode != QLatin1String("screen") && mode != QLatin1String("microphone") && mode != QLatin1String("system-audio")) return;
+    if (inputMode() == mode) return;
+    settings_.setValue(QStringLiteral("input/mode"), mode); settings_.sync(); emit inputModeChanged();
+}
+AudioSettings SettingsManager::audioSettings() const
+{
+    AudioSettings value;
+    value.microphoneId = settings_.value(QStringLiteral("audio/microphoneId")).toByteArray();
+    value.outputId = settings_.value(QStringLiteral("audio/outputId")).toByteArray();
+    value.modelPath = settings_.value(QStringLiteral("asr/modelPath")).toString();
+    const auto language = settings_.value(QStringLiteral("asr/language"), QStringLiteral("auto")).toString();
+    if (QStringList{"auto", "en", "zh", "ja", "ko"}.contains(language)) value.language = language;
+    return value;
+}
+void SettingsManager::setAudioSettings(AudioSettings value)
+{
+    if (!QStringList{"auto", "en", "zh", "ja", "ko"}.contains(value.language)) value.language = QStringLiteral("auto");
+    value.modelPath = value.modelPath.trimmed();
+    if (audioSettings() == value) return;
+    settings_.setValue(QStringLiteral("audio/microphoneId"), value.microphoneId);
+    settings_.setValue(QStringLiteral("audio/outputId"), value.outputId);
+    settings_.setValue(QStringLiteral("asr/modelPath"), value.modelPath);
+    settings_.setValue(QStringLiteral("asr/language"), value.language);
+    settings_.sync(); emit audioSettingsChanged();
+}
+
 bool SettingsManager::overlayDragLocked() const
 {
     return settings_.value(QStringLiteral("overlay/dragLocked"), false).toBool();

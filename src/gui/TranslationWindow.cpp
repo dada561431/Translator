@@ -4,6 +4,7 @@
 #include "gui/SettingsDialog.h"
 
 #include <QCloseEvent>
+#include <QComboBox>
 #include <QColor>
 #include <QCursor>
 #include <QEnterEvent>
@@ -205,7 +206,9 @@ void TranslationWindow::setOriginalText(const QString &text)
 
 void TranslationWindow::setRegionFeedback(const QString &message)
 {
-    regionButton_->setToolTip(message);
+    regionButton_->setToolTip(settings_.inputMode() == QLatin1String("screen") ? message
+        : tr("Region is only available in Screen mode."));
+    inputModeCombo_->setToolTip(message);
     showToolbarStatus(message);
 }
 
@@ -323,7 +326,14 @@ void TranslationWindow::createUi()
     titleLabel->setObjectName(QStringLiteral("windowTitleLabel"));
     titleLabel->setAttribute(Qt::WA_TransparentForMouseEvents);
     titleLabel->installEventFilter(this);
-    toolbarLayout->addWidget(titleLabel);
+    titleLabel->hide();
+    inputModeCombo_ = new QComboBox(toolbar_);
+    inputModeCombo_->setObjectName(QStringLiteral("inputModeCombo"));
+    inputModeCombo_->addItem(tr("Screen"), "screen");
+    inputModeCombo_->addItem(tr("Microphone"), "microphone");
+    inputModeCombo_->addItem(tr("System Audio"), "system-audio");
+    inputModeCombo_->setFixedWidth(inputModeCombo_->fontMetrics().horizontalAdvance(tr("System Audio")) + 28);
+    toolbarLayout->addWidget(inputModeCombo_);
 
     statusLabel_ = new QLabel(toolbar_);
     statusLabel_->setObjectName(QStringLiteral("statusLabel"));
@@ -361,6 +371,18 @@ void TranslationWindow::createUi()
     toolbarLayout->addWidget(settingsButton_);
     toolbarLayout->addWidget(lockButton_);
     toolbarLayout->addWidget(closeButton_);
+    auto refreshMode = [this] {
+        const QSignalBlocker blocker(inputModeCombo_);
+        inputModeCombo_->setCurrentIndex(inputModeCombo_->findData(settings_.inputMode()));
+        const bool screen = settings_.inputMode() == QLatin1String("screen");
+        regionButton_->setEnabled(screen);
+        regionButton_->setToolTip(screen ? tr("Screen Region") : tr("Region is only available in Screen mode."));
+    };
+    connect(&settings_, &SettingsManager::inputModeChanged, this, refreshMode);
+    connect(inputModeCombo_, &QComboBox::currentIndexChanged, this, [this] {
+        settings_.setInputMode(inputModeCombo_->currentData().toString());
+    });
+    refreshMode();
     subtitleArea_ = new QWidget(this);
     subtitleArea_->setObjectName(QStringLiteral("subtitleArea"));
     subtitleArea_->setMouseTracking(true);
@@ -435,7 +457,7 @@ void TranslationWindow::createUi()
             background-color: rgba(69, 73, 79, 225);
             border: 1px solid #646a72;
             border-radius: 4px;
-            padding: 5px 10px;
+            padding: 5px 4px;
         }
         QPushButton:hover {
             background-color: rgba(85, 91, 98, 240);

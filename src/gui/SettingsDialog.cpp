@@ -20,6 +20,7 @@
 #include <QKeySequenceEdit>
 #include <QScrollArea>
 #include <QScreen>
+#include <QFileDialog>
 
 SettingsDialog::SettingsDialog(SettingsManager &settings, QWidget *parent, ICredentialStore *credentials)
     : QDialog(parent), settings_(settings)
@@ -123,6 +124,41 @@ void SettingsDialog::createUi()
     privacyLabel_ = new QLabel(tr("识别出的文字将发送至所选翻译服务。"), this);
     privacyLabel_->setWordWrap(true);
     content->addWidget(privacyLabel_);
+    auto *audioForm = new QFormLayout();
+    inputModeCombo_ = new QComboBox(this);
+    inputModeCombo_->setObjectName(QStringLiteral("inputModeSettingsCombo"));
+    inputModeCombo_->addItem(tr("Screen"), "screen");
+    inputModeCombo_->addItem(tr("Microphone"), "microphone");
+    inputModeCombo_->addItem(tr("System Audio"), "system-audio");
+    microphoneCombo_ = new QComboBox(this);
+    microphoneCombo_->setObjectName(QStringLiteral("microphoneDeviceCombo"));
+    outputCombo_ = new QComboBox(this);
+    outputCombo_->setObjectName(QStringLiteral("outputDeviceCombo"));
+    speechLanguageCombo_ = new QComboBox(this);
+    speechLanguageCombo_->setObjectName(QStringLiteral("speechLanguageCombo"));
+    const QStringList speechNames{tr("Auto"), tr("English"), tr("Chinese"), tr("Japanese"), tr("Korean")};
+    const QStringList speechIds{"auto", "en", "zh", "ja", "ko"};
+    for (int i = 0; i < speechIds.size(); ++i) speechLanguageCombo_->addItem(speechNames[i], speechIds[i]);
+    auto *modelRow = new QWidget(this);
+    auto *modelLayout = new QHBoxLayout(modelRow);
+    modelLayout->setContentsMargins(0, 0, 0, 0);
+    speechModelEdit_ = new QLineEdit(modelRow);
+    speechModelEdit_->setObjectName(QStringLiteral("speechModelEdit"));
+    speechModelEdit_->setPlaceholderText(QStringLiteral("models/ggml-base.bin"));
+    auto *browse = new QPushButton(tr("Browse..."), modelRow);
+    browse->setObjectName(QStringLiteral("speechModelBrowse"));
+    modelLayout->addWidget(speechModelEdit_, 1); modelLayout->addWidget(browse);
+    connect(browse, &QPushButton::clicked, this, [this] {
+        const auto path = QFileDialog::getOpenFileName(this, tr("Speech model"), speechModelEdit_->text(), tr("Whisper models (*.bin);;All files (*)"));
+        if (!path.isEmpty()) speechModelEdit_->setText(path);
+    });
+    audioForm->addRow(tr("Input mode"), inputModeCombo_);
+    audioForm->addRow(tr("Microphone Device"), microphoneCombo_);
+    audioForm->addRow(tr("Output Device"), outputCombo_);
+    audioForm->addRow(tr("ASR Model"), modelRow);
+    audioForm->addRow(tr("Speech Recognition Language"), speechLanguageCombo_);
+    audioForm->addRow(tr("Speech Detection"), new QLabel(tr("Automatic"), this));
+    content->addLayout(audioForm);
     auto *overlayForm = new QFormLayout();
     translationFontSize_ = new QDoubleSpinBox(this);
     translationFontSize_->setObjectName(QStringLiteral("translationFontSizeSpin"));
@@ -195,7 +231,26 @@ void SettingsDialog::loadSettings()
     baseUrlEdit_->setText(settings_.openAiBaseUrl());
     modelEdit_->setText(settings_.openAiModel());
     loadOverlaySettings();
+    loadAudioSettings();
     updateProvider();
+}
+
+void SettingsDialog::loadAudioSettings()
+{
+    const auto saved = settings_.audioSettings();
+    selectById(inputModeCombo_, settings_.inputMode());
+    selectById(speechLanguageCombo_, saved.language);
+    speechModelEdit_->setText(saved.modelPath);
+    auto populate = [this](QComboBox *combo, Audio::InputKind kind, const QByteArray &id) {
+        combo->clear();
+        combo->addItem(kind == Audio::InputKind::Microphone ? tr("Default") : tr("Default Output"), QByteArray());
+        if (enumerateAudio_) for (const auto &device : enumerateAudio_(kind)) combo->addItem(device.description, device.id);
+        int index = combo->findData(id);
+        if (index < 0) { combo->addItem(tr("Configured device unavailable"), id); index = combo->count() - 1; }
+        combo->setCurrentIndex(index);
+    };
+    populate(microphoneCombo_, Audio::InputKind::Microphone, saved.microphoneId);
+    populate(outputCombo_, Audio::InputKind::SystemLoopback, saved.outputId);
 }
 
 void SettingsDialog::loadOverlaySettings()
@@ -359,6 +414,9 @@ bool SettingsDialog::applyCredentials()
     if (excludeFromCapture_->isEnabled())
         settings_.setOverlayExcludeFromCapture(excludeFromCapture_->isChecked());
     settings_.setOverlayDragLocked(dragLocked_->isChecked());
+    settings_.setAudioSettings({microphoneCombo_->currentData().toByteArray(), outputCombo_->currentData().toByteArray(),
+        speechModelEdit_->text(), speechLanguageCombo_->currentData().toString()});
+    settings_.setInputMode(inputModeCombo_->currentData().toString());
     const QSignalBlocker blocker(apiKeyEdit_);
     apiKeyEdit_->clear();
     updateProvider();
@@ -378,6 +436,7 @@ void SettingsDialog::reject()
 {
     clearDrafts();
     loadOverlaySettings();
+    loadAudioSettings();
     QDialog::reject();
 }
 

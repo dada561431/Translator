@@ -21,6 +21,11 @@
 #include "ocr/OcrEngineFactory.h"
 #include "translator/TranslatorFactory.h"
 #include "credentials/ICredentialStore.h"
+#include "app/ProductionInputController.h"
+#include "gui/SettingsDialog.h"
+#ifdef TRANSLATOR_HAS_WHISPER
+#include "asr/WhisperCppAsrBackend.h"
+#endif
 
 #include <memory>
 #include <iterator>
@@ -58,10 +63,35 @@ int main(int argc, char *argv[])
         return TranslatorFactory::create(settings, *credentials);
     });
     RealtimePipelineCoordinator realtime(settings, ocrCoordinator, translationCoordinator);
+    AudioInputCoordinator audioCapture;
+#ifdef TRANSLATOR_HAS_WHISPER
+    AsrCoordinator asr([] { return std::make_unique<WhisperCppAsrBackend>(); });
+    constexpr bool speechAvailable = true;
+#else
+    AsrCoordinator asr({});
+    constexpr bool speechAvailable = false;
+#endif
+    AudioTranslationCoordinator audio(audioCapture, asr, translationCoordinator);
+    if (qEnvironmentVariableIntValue("TRANSLATOR_AUDIO_DIAGNOSTICS") == 1) {
+        QObject::connect(&audio, &AudioTranslationCoordinator::latencyMeasured, &application,
+            [](quint64 session, quint64 utterance, const QString &stage, qint64 end, qint64 boundary, qint64 now, qint64 processing) {
+                qInfo() << "[Audio QA]" << session << utterance << stage
+                        << "speech_end_ms" << (now - end) / 1000 << "boundary_ms" << (now - boundary) / 1000
+                        << "processing_ms" << processing;
+            });
+        QObject::connect(&audio, &AudioTranslationCoordinator::translationRequested, &application,
+            [](quint64 session, quint64 utterance, const TranslationRequest &) { qInfo() << "[Audio QA] translation request" << session << utterance; });
+    }
+    ProductionInputController input(settings, audioCapture, asr, audio,
+        {[&] { realtime.start(); }, [&] { realtime.stop(); }, [&] { return realtime.isRunning(); }}, speechAvailable);
+    translationWindow.settingsDialog()->setAudioDevices([&](auto kind) { return audioCapture.devices(kind); });
+    QObject::connect(&input, &ProductionInputController::stateChanged, &translationWindow, &TranslationWindow::setTranslationRunning);
+    QObject::connect(&input, &ProductionInputController::feedback, &translationWindow, &TranslationWindow::setRegionFeedback);
+    QObject::connect(&audio, &AudioTranslationCoordinator::originalTextReady, &translationWindow, &TranslationWindow::setOriginalText);
     QObject::connect(&translationWindow, &TranslationWindow::stopRequested,
-                     &realtime, &RealtimePipelineCoordinator::stop);
+                     &input, &ProductionInputController::stop);
     QObject::connect(&captureCoordinator, &CaptureCoordinator::selectionStarted,
-                     &realtime, &RealtimePipelineCoordinator::stop);
+                     &input, &ProductionInputController::stop);
     QObject::connect(&realtime, &RealtimePipelineCoordinator::runningChanged,
                      &translationWindow, &TranslationWindow::setTranslationRunning);
     QObject::connect(&realtime, &RealtimePipelineCoordinator::feedback,
@@ -81,18 +111,24 @@ int main(int argc, char *argv[])
 #endif
                      });
     QObject::connect(&captureCoordinator, &CaptureCoordinator::captureCompleted,
-                     &realtime, &RealtimePipelineCoordinator::acceptOneShot);
+                     &realtime, [&realtime, &input](const CaptureResult &result) {
+                         if (input.isScreen()) realtime.acceptOneShot(result);
+                     });
     translationWindow.show();
     GlobalShortcutManager shortcuts;
     OverlayInteractionController overlayInteraction(translationWindow, settings, shortcuts, {
         [&] { return captureCoordinator.isSelecting(); },
-        [&] { captureCoordinator.beginSelection(); },
-        [&] { return realtime.isRunning(); },
-        [&] { realtime.start(); },
-        [&] { realtime.stop(); },
-        [&] { application.quit(); }
+        [&] { if (input.isScreen()) captureCoordinator.beginSelection(); },
+        [&] { return input.isRunning(); },
+        [&] { input.start(); },
+        [&] { input.stop(); },
+        [&] { application.quit(); },
+        [&] { return input.isScreen(); }
     });
     OverlayTrayController tray(overlayInteraction, translationWindow);
+    QObject::connect(&input, &ProductionInputController::stateChanged, &overlayInteraction, &OverlayInteractionController::refreshState);
+    QObject::connect(&settings, &SettingsManager::inputModeChanged, &overlayInteraction, &OverlayInteractionController::refreshState);
+    QObject::connect(&application, &QCoreApplication::aboutToQuit, &input, &ProductionInputController::stop);
     QObject::connect(&realtime, &RealtimePipelineCoordinator::runningChanged,
                      &overlayInteraction, &OverlayInteractionController::refreshState);
     QObject::connect(&captureCoordinator, &CaptureCoordinator::selectionStarted,

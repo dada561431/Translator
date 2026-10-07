@@ -7,6 +7,9 @@
 #include <QMenu>
 #include <QStyle>
 #include <QSystemTrayIcon>
+#include <QActionGroup>
+#include <QComboBox>
+#include "config/SettingsManager.h"
 
 OverlayTrayController::OverlayTrayController(OverlayInteractionController &controller,
     TranslationWindow &window, QObject *parent, std::function<bool()> availability, bool showNativeIcon)
@@ -22,6 +25,17 @@ OverlayTrayController::OverlayTrayController(OverlayInteractionController &contr
         return action;
     };
     visibility_ = add("trayVisibility"); interaction_ = add("trayInteraction"); lock_ = add("trayLock");
+    // Toolbar and tray share the same SettingsManager-backed mode selection.
+    auto *modeCombo = window_.findChild<QComboBox *>(QStringLiteral("inputModeCombo"));
+    auto *modeMenu = menu_->addMenu(tr("Input Mode"));
+    auto *group = new QActionGroup(modeMenu);
+    for (int i = 0; i < modeCombo->count(); ++i) {
+        auto *action = modeMenu->addAction(modeCombo->itemText(i));
+        action->setObjectName(QStringLiteral("trayMode%1").arg(i));
+        action->setCheckable(true); group->addAction(action); modes_.append(action);
+        connect(action, &QAction::triggered, this, [modeCombo, i] { modeCombo->setCurrentIndex(i); });
+    }
+    connect(modeCombo, &QComboBox::currentIndexChanged, this, &OverlayTrayController::refresh);
     menu_->addSeparator();
     region_ = add("trayRegion"); realtime_ = add("trayRealtime"); settings_ = add("traySettings");
     menu_->addSeparator(); exit_ = add("trayExit");
@@ -64,4 +78,7 @@ void OverlayTrayController::refresh()
     for (auto *action : {visibility_, interaction_, lock_, region_, realtime_, settings_}) action->setEnabled(!selecting);
     visibility_->setEnabled(!selecting && available_);
     interaction_->setEnabled(!selecting && (through || controller_.canClickThrough()));
+    region_->setEnabled(!selecting && controller_.regionAvailable());
+    const auto *combo = window_.findChild<QComboBox *>(QStringLiteral("inputModeCombo"));
+    for (int i = 0; i < modes_.size(); ++i) { modes_[i]->setChecked(combo->currentIndex() == i); modes_[i]->setEnabled(!selecting); }
 }

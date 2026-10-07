@@ -7,6 +7,7 @@
 #include "config/GlobalHotkeyConfig.h"
 #include <functional>
 #include <utility>
+#include "audio/AudioInputTypes.h"
 class QKeySequenceEdit;
 
 class QComboBox;
@@ -26,6 +27,8 @@ public:
     explicit SettingsDialog(SettingsManager &settings, QWidget *parent = nullptr,
                             ICredentialStore *credentials = nullptr);
     void reject() override;
+    using DeviceEnumerator = std::function<QList<Audio::DeviceInfo>(Audio::InputKind)>;
+    void setAudioDevices(DeviceEnumerator enumerate) { enumerateAudio_ = std::move(enumerate); }
     void setCaptureExclusionAvailable(bool available);
     void setHotkeyApplyHandler(std::function<bool(const GlobalHotkeyConfig &, QString &)> handler) { hotkeyApply_ = std::move(handler); }
 
@@ -35,6 +38,7 @@ protected:
 private:
     void createUi();
     void loadSettings();
+    void loadAudioSettings();
     void connectSettings();
     static void selectById(QComboBox *comboBox, const QString &id);
     void updateProvider();
@@ -50,6 +54,12 @@ private:
     QString displayedProvider_;
 
     SettingsManager &settings_;
+    DeviceEnumerator enumerateAudio_;
+    QComboBox *inputModeCombo_ = nullptr;
+    QComboBox *microphoneCombo_ = nullptr;
+    QComboBox *outputCombo_ = nullptr;
+    QComboBox *speechLanguageCombo_ = nullptr;
+    QLineEdit *speechModelEdit_ = nullptr;
     QComboBox *sourceLanguageCombo_ = nullptr;
     QComboBox *targetLanguageCombo_ = nullptr;
     QComboBox *ocrEngineCombo_ = nullptr;

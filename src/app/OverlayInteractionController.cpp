@@ -73,7 +73,7 @@ void OverlayInteractionController::routeControl(OverlayControlAction action)
         window_.setInteractionMode(OverlayInteractionMode::Interactive);
         settings_.setOverlayClickThrough(false);
         window_.show(); break;
-    case OverlayControlAction::SelectRegion: actions_.selectRegion(); break;
+    case OverlayControlAction::SelectRegion: if (regionAvailable()) actions_.selectRegion(); break;
     case OverlayControlAction::ToggleRealtime: if (running()) actions_.stop(); else actions_.start(); break;
     case OverlayControlAction::Start: if (!running()) actions_.start(); break;
     case OverlayControlAction::Stop: actions_.stop(); break;

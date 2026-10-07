@@ -8,6 +8,7 @@
 #include <utility>
 
 class QCloseEvent;
+class QComboBox;
 class QEnterEvent;
 class QEvent;
 class QLabel;
@@ -87,6 +88,7 @@ private:
     QWidget *toolbar_ = nullptr;
     QWidget *subtitleArea_ = nullptr;
     QPushButton *regionButton_ = nullptr;
+    QComboBox *inputModeCombo_ = nullptr;
     QPushButton *startButton_ = nullptr;
     QPushButton *stopButton_ = nullptr;
     QPushButton *settingsButton_ = nullptr;

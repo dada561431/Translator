@@ -18,6 +18,7 @@ public:
         std::function<void()> start;
         std::function<void()> stop;
         std::function<void()> exit;
+        std::function<bool()> regionAvailable;
     };
     OverlayInteractionController(TranslationWindow &window, SettingsManager &settings,
                                  GlobalShortcutManager &shortcuts, Actions actions, QObject *parent = nullptr);
@@ -28,6 +29,7 @@ public:
     void setTrayAvailable(bool available) { trayAvailable_ = available; }
     bool running() const { return actions_.realtimeRunning(); }
     bool selecting() const { return actions_.selectingRegion(); }
+    bool regionAvailable() const { return !actions_.regionAvailable || actions_.regionAvailable(); }
     bool canClickThrough() const;
     void refreshState() { emit stateChanged(); }
 

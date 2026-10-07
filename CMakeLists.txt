@@ -12,7 +12,7 @@ set(CMAKE_AUTORCC ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network)
 
-# Audio acquisition is opt-in through the Phase 8C QA entry, never normal startup.
+# Device acquisition remains explicit Start only, including production UI.
 find_package(Qt6 REQUIRED COMPONENTS Multimedia)
 add_library(TranslatorAudio STATIC
     src/audio/AudioInputTypes.h src/audio/IAudioInput.h
@@ -37,6 +37,11 @@ set(TRANSLATOR_WHISPER_CPP_DIR "" CACHE PATH "Explicit local whisper.cpp checkou
 if(TRANSLATOR_WHISPER_CPP_DIR)
     if(NOT EXISTS "${TRANSLATOR_WHISPER_CPP_DIR}/include/whisper.h")
         message(FATAL_ERROR "TRANSLATOR_WHISPER_CPP_DIR must contain a prepared whisper.cpp checkout")
+    endif()
+    execute_process(COMMAND git -C "${TRANSLATOR_WHISPER_CPP_DIR}" rev-parse HEAD
+        OUTPUT_VARIABLE WHISPER_PIN OUTPUT_STRIP_TRAILING_WHITESPACE RESULT_VARIABLE WHISPER_PIN_STATUS)
+    if(NOT WHISPER_PIN_STATUS EQUAL 0 OR NOT WHISPER_PIN STREQUAL "48f628a84833905ee4a0658ee6d4a5c915ce1997")
+        message(FATAL_ERROR "Use the Phase 8B pinned whisper.cpp checkout: 48f628a84833905ee4a0658ee6d4a5c915ce1997")
     endif()
     enable_language(C)
     set(WHISPER_BUILD_TESTS OFF CACHE BOOL "" FORCE)
@@ -121,6 +126,7 @@ add_library(TranslatorAudioPipeline STATIC
     src/audio/SpeechEndpointDetector.h src/audio/SpeechEndpointDetector.cpp
     src/app/AudioTranslationCoordinator.h src/app/AudioTranslationCoordinator.cpp
     src/app/InputPipelineController.h
+    src/app/ProductionInputController.h src/app/ProductionInputController.cpp
     src/app/TranslationCoordinator.h src/app/TranslationCoordinator.cpp
     src/config/SettingsManager.h src/config/SettingsManager.cpp)
 target_link_libraries(TranslatorAudioPipeline PUBLIC TranslatorAudio TranslatorAsrCore TranslatorProviders Qt6::Gui)
@@ -130,7 +136,7 @@ add_executable(Translator
     ${PADDLE_OCR_SOURCES}
     src/ocr/OcrEngineFactory.h src/ocr/OcrEngineFactory.cpp
     ${REALTIME_SOURCES}
-    ${TRANSLATION_SOURCES}
+    src/translator/TranslatorFactory.h src/translator/TranslatorFactory.cpp
     src/main.cpp
     src/app/RuntimeSelfCheck.cpp src/app/RuntimeSelfCheck.h
     src/app/CaptureCoordinator.cpp
@@ -141,8 +147,6 @@ add_executable(Translator
     src/capture/RegionSelector.h
     src/capture/ScreenCaptureService.cpp
     src/capture/ScreenCaptureService.h
-    src/config/SettingsManager.cpp
-    src/config/SettingsManager.h
     src/gui/SettingsDialog.cpp
     src/gui/SettingsDialog.h
     src/gui/TranslationWindow.cpp
@@ -158,6 +162,7 @@ add_executable(Translator
 target_include_directories(Translator PRIVATE src)
 
 target_link_libraries(Translator PRIVATE
+    TranslatorAudioPipeline
     TranslatorOverlayPlatform
     TranslatorProviders
     Qt6::Core
@@ -165,6 +170,14 @@ target_link_libraries(Translator PRIVATE
     Qt6::Widgets
     Qt6::Network
 )
+if(TARGET TranslatorWhisperCppBackend)
+    target_link_libraries(Translator PRIVATE TranslatorWhisperCppBackend)
+    target_compile_definitions(Translator PRIVATE TRANSLATOR_HAS_WHISPER=1)
+    file(GENERATE OUTPUT "${CMAKE_BINARY_DIR}/audio-build.json" CONTENT
+        "{\"backend\":\"whisper.cpp\",\"linkage\":\"static\",\"commit\":\"${WHISPER_PIN}\"}\n")
+else()
+    file(GENERATE OUTPUT "${CMAKE_BINARY_DIR}/audio-build.json" CONTENT "{\"backend\":\"unavailable\"}\n")
+endif()
 if(WIN32)
     target_link_libraries(Translator PRIVATE user32)
 endif()
@@ -176,6 +189,16 @@ set_target_properties(Translator PROPERTIES
 include(CTest)
 
 if(BUILD_TESTING)
+    add_executable(TranslatorAudioProductizationTests tests/AudioProductizationTest.cpp
+        ${OVERLAY_INTERACTION_SOURCES}
+        src/gui/TranslationWindow.cpp src/gui/TranslationWindow.h
+        src/gui/SettingsDialog.cpp src/gui/SettingsDialog.h)
+    target_link_libraries(TranslatorAudioProductizationTests PRIVATE TranslatorAudioPipeline TranslatorOverlayPlatform Qt6::Widgets)
+    if(WIN32)
+        target_link_libraries(TranslatorAudioProductizationTests PRIVATE user32)
+    endif()
+    add_test(NAME phase8d_audio_productization COMMAND TranslatorAudioProductizationTests)
+    set_tests_properties(phase8d_audio_productization PROPERTIES TIMEOUT 30 ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
     add_executable(TranslatorSpeechEndpointTests tests/SpeechEndpointDetectorTest.cpp)
     target_link_libraries(TranslatorSpeechEndpointTests PRIVATE TranslatorAudioPipeline)
     add_test(NAME phase8c1_speech_endpoint COMMAND TranslatorSpeechEndpointTests)
